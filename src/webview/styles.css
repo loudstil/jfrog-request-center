@@ -33,6 +33,11 @@ body {
   flex: 1;
 }
 
+.query-name {
+  margin-left: 8px;
+  font-weight: 600;
+}
+
 .muted {
   color: var(--vscode-descriptionForeground);
   font-size: 12px;

@@ -12,6 +12,10 @@ A VS Code extension for writing and running AQL (Artifactory Query Language) que
   syntax highlighting and autocomplete (domains, methods, fields for the queried domain, and `$`
   operators), run it with **Execute AQL** or Ctrl/Cmd+Enter, and see the results in a table. You
   can copy them or open them as JSON. The editor follows your VS Code theme and editor font.
+- **Saved queries**: **Save** (Ctrl/Cmd+S) and **Save As…** in the AQL Manager. Saved queries are
+  listed in the JFrog Request Center sidebar (activity bar icon). Click one to open it, or use the
+  context menu to rename or delete it. They're stored in VS Code's global state and sync with
+  Settings Sync.
 - **Status bar**: shows whether Artifactory can be reached and which version it runs.
 
 ## Development

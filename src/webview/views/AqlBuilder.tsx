@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
+import type { SavedQueryRef } from '../../shared/messages';
 import { AqlEditor } from '../components/AqlEditor';
 import { ResultsGrid } from '../components/ResultsGrid';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from '../utils/vscode';
@@ -16,7 +17,12 @@ type RunState =
   | { kind: 'done'; rows: Record<string, unknown>[]; range?: AqlRange; elapsedMs: number };
 
 export function AqlBuilder() {
-  const [query, setQuery] = useState(() => getPersistedState()?.query ?? DEFAULT_QUERY);
+  const [initial] = useState(getPersistedState);
+  const [query, setQuery] = useState(initial?.query ?? DEFAULT_QUERY);
+  const [savedQuery, setSavedQuery] = useState<SavedQueryRef | undefined>(initial?.savedQuery);
+  const [baseline, setBaseline] = useState(initial?.baseline ?? DEFAULT_QUERY);
+  // The latest list of saved queries from the extension; undefined until it arrives.
+  const [knownQueries, setKnownQueries] = useState<SavedQueryRef[] | undefined>(undefined);
   const [run, setRun] = useState<RunState>({ kind: 'idle' });
   // undefined = not configured, null = not known yet.
   const [baseUrl, setBaseUrl] = useState<string | undefined | null>(null);
@@ -41,13 +47,49 @@ export function AqlBuilder() {
             setRun({ kind: 'error', message: msg.message, errorKind: msg.kind });
           }
           break;
+        case 'loadQuery':
+          setQuery(msg.query);
+          setBaseline(msg.query);
+          setSavedQuery(msg.savedQuery);
+          setRun({ kind: 'idle' });
+          break;
+        case 'querySaved':
+          setSavedQuery(msg.savedQuery);
+          setBaseline(msg.query);
+          break;
+        case 'savedQueries':
+          setKnownQueries(msg.queries);
+          break;
       }
     });
     postMessage({ type: 'ready' });
     return unsubscribe;
   }, []);
 
-  useEffect(() => setPersistedState({ query }), [query]);
+  // Follow renames from the sidebar. If our saved query was deleted, keep the text as unsaved.
+  useEffect(() => {
+    if (!savedQuery || !knownQueries) {
+      return;
+    }
+    const match = knownQueries.find((q) => q.id === savedQuery.id);
+    if (!match) {
+      setSavedQuery(undefined);
+      setBaseline('');
+    } else if (match.name !== savedQuery.name) {
+      setSavedQuery(match);
+    }
+  }, [knownQueries, savedQuery]);
+
+  const dirty = query !== baseline && (savedQuery !== undefined || query.trim() !== '');
+
+  useEffect(
+    () => setPersistedState({ query, savedQuery, baseline }),
+    [query, savedQuery, baseline],
+  );
+  useEffect(
+    () => postMessage({ type: 'editorState', savedQueryId: savedQuery?.id, dirty }),
+    [savedQuery?.id, dirty],
+  );
 
   const running = run.kind === 'running';
 
@@ -67,8 +109,18 @@ export function AqlBuilder() {
     }
   }
 
+  function save(saveAs = false) {
+    if (!query.trim()) {
+      return;
+    }
+    postMessage({ type: 'saveQuery', query, savedQueryId: savedQuery?.id, saveAs });
+  }
+
+  /** Starts a fresh, unsaved query. */
   function clear() {
     setQuery('');
+    setBaseline('');
+    setSavedQuery(undefined);
     setRun({ kind: 'idle' });
   }
 
@@ -89,9 +141,33 @@ export function AqlBuilder() {
             ▶ Execute AQL
           </button>
         )}
-        <button className="button secondary" onClick={clear} disabled={running}>
+        <button
+          className="button secondary"
+          onClick={() => save()}
+          disabled={!query.trim()}
+          title="Save (Ctrl/Cmd+S)"
+        >
+          Save
+        </button>
+        {savedQuery && (
+          <button className="button secondary" onClick={() => save(true)} disabled={!query.trim()}>
+            Save As…
+          </button>
+        )}
+        <button
+          className="button secondary"
+          onClick={clear}
+          disabled={running}
+          title="Clear the editor and start a new query"
+        >
           Clear
         </button>
+        {savedQuery && (
+          <span className="query-name" title={dirty ? 'Unsaved changes' : undefined}>
+            {savedQuery.name}
+            {dirty && <span aria-label="unsaved changes"> ●</span>}
+          </span>
+        )}
         <span className="spacer" />
         {baseUrl && <span className="muted">{baseUrl}</span>}
       </div>
@@ -105,7 +181,7 @@ export function AqlBuilder() {
         </div>
       )}
 
-      <AqlEditor value={query} onChange={setQuery} onExecute={execute} />
+      <AqlEditor value={query} onChange={setQuery} onExecute={execute} onSave={save} />
 
       <ResultsPane run={run} />
     </div>

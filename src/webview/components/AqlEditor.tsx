@@ -6,18 +6,22 @@ interface AqlEditorProps {
   onChange: (value: string) => void;
   /** Called on Ctrl/Cmd+Enter. */
   onExecute: () => void;
+  /** Called on Ctrl/Cmd+S. */
+  onSave: () => void;
 }
 
 /** A Monaco editor for AQL that follows the VS Code theme and editor font. */
-export function AqlEditor({ value, onChange, onExecute }: AqlEditorProps) {
+export function AqlEditor({ value, onChange, onExecute, onSave }: AqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   // Monaco callbacks are registered once, so route them through refs to the latest props.
   const onChangeRef = useRef(onChange);
   const onExecuteRef = useRef(onExecute);
+  const onSaveRef = useRef(onSave);
   useEffect(() => {
     onChangeRef.current = onChange;
     onExecuteRef.current = onExecute;
+    onSaveRef.current = onSave;
   });
 
   useEffect(() => {
@@ -39,6 +43,7 @@ export function AqlEditor({ value, onChange, onExecute }: AqlEditorProps) {
       wordBasedSuggestions: 'off',
     });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onExecuteRef.current());
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());
     const subscription = editor.onDidChangeModelContent(() =>
       onChangeRef.current(editor.getValue()),
     );

@@ -31,6 +31,29 @@
         "command": "jfrogRequestCenter.openAqlManager",
         "title": "Open AQL Manager",
         "category": "JFrog Request Center"
+      },
+      {
+        "command": "jfrogRequestCenter.newQuery",
+        "title": "New AQL Query",
+        "category": "JFrog Request Center",
+        "icon": "$(add)"
+      },
+      {
+        "command": "jfrogRequestCenter.openSavedQuery",
+        "title": "Open Saved Query…",
+        "category": "JFrog Request Center"
+      },
+      {
+        "command": "jfrogRequestCenter.renameSavedQuery",
+        "title": "Rename Saved Query…",
+        "category": "JFrog Request Center",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jfrogRequestCenter.deleteSavedQuery",
+        "title": "Delete Saved Query…",
+        "category": "JFrog Request Center",
+        "icon": "$(trash)"
       }
     ],
     "configuration": {
@@ -47,6 +70,55 @@
           "markdownDescription": "Optional username. When set, requests use Basic auth (`username:token`); otherwise the access token is sent as a Bearer token."
         }
       }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jfrogRequestCenter",
+          "title": "JFrog Request Center",
+          "icon": "media/activity-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "jfrogRequestCenter": [
+        {
+          "id": "jfrogRequestCenter.savedQueries",
+          "name": "Saved Queries"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "jfrogRequestCenter.savedQueries",
+        "contents": "No saved queries yet. Write a query in the AQL Manager and click Save.\n[Open AQL Manager](command:jfrogRequestCenter.openAqlManager)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "jfrogRequestCenter.newQuery",
+          "when": "view == jfrogRequestCenter.savedQueries",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "jfrogRequestCenter.deleteSavedQuery",
+          "when": "view == jfrogRequestCenter.savedQueries && viewItem == savedQuery",
+          "group": "inline"
+        },
+        {
+          "command": "jfrogRequestCenter.renameSavedQuery",
+          "when": "view == jfrogRequestCenter.savedQueries && viewItem == savedQuery",
+          "group": "1_modify@1"
+        },
+        {
+          "command": "jfrogRequestCenter.deleteSavedQuery",
+          "when": "view == jfrogRequestCenter.savedQueries && viewItem == savedQuery",
+          "group": "1_modify@2"
+        }
+      ]
     }
   },
   "scripts": {

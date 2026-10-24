@@ -1,5 +1,5 @@
 // Typed wrapper around the webview's postMessage bridge to the extension host.
-import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messages';
+import type { ExtensionToWebview, SavedQueryRef, WebviewToExtension } from '../../shared/messages';
 
 interface VsCodeApi<State> {
   postMessage(message: unknown): void;
@@ -12,6 +12,10 @@ declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 /** State VS Code keeps for us while the panel is hidden or moved. */
 export interface PersistedState {
   query: string;
+  /** The saved query being edited, if any. */
+  savedQuery?: SavedQueryRef;
+  /** The text the query had when it was last saved or loaded; used to detect unsaved changes. */
+  baseline?: string;
 }
 
 // acquireVsCodeApi may only be called once per webview.
