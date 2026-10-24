@@ -69,8 +69,7 @@ body {
 
 .button:focus-visible,
 .icon-button:focus-visible,
-.link:focus-visible,
-.editor:focus {
+.link:focus-visible {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
 }
@@ -111,16 +110,8 @@ body {
 .editor {
   flex: 2 1 0;
   min-height: 120px;
-  padding: 8px 12px;
-  border: none;
+  overflow: hidden; /* Monaco sizes itself to this container */
   border-bottom: 1px solid var(--vscode-panel-border);
-  resize: none;
-  color: var(--vscode-editor-foreground);
-  background: var(--vscode-editor-background);
-  font-family: var(--vscode-editor-font-family);
-  font-size: var(--vscode-editor-font-size);
-  line-height: 1.5;
-  tab-size: 2;
 }
 
 .results {

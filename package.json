@@ -57,7 +57,7 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production",
-    "package": "vsce package --no-dependencies"
+    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -68,6 +68,7 @@
     "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "eslint": "^9.39.5",
+    "monaco-editor": "^0.57.0",
     "prettier": "^3.9.10",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

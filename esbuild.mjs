@@ -29,7 +29,17 @@ const contexts = await Promise.all([
     format: 'iife',
     target: 'es2022',
     jsx: 'automatic',
+    loader: { '.ttf': 'file' }, // Monaco's codicon font
     define: { 'process.env.NODE_ENV': JSON.stringify(production ? 'production' : 'development') },
+  }),
+  // Monaco's background worker (diffing, link detection). The webview starts it from a blob URL.
+  esbuild.context({
+    ...common,
+    entryPoints: ['node_modules/monaco-editor/esm/vs/editor/editor.worker.js'],
+    outfile: 'dist/editor.worker.js',
+    platform: 'browser',
+    format: 'iife',
+    target: 'es2022',
   }),
 ]);
 

@@ -1,5 +1,6 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
+import { AqlEditor } from '../components/AqlEditor';
 import { ResultsGrid } from '../components/ResultsGrid';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from '../utils/vscode';
 
@@ -51,7 +52,7 @@ export function AqlBuilder() {
   const running = run.kind === 'running';
 
   function execute() {
-    if (running || !query.trim()) {
+    if (running || !query.trim() || !baseUrl) {
       return;
     }
     const requestId = nextRequestId.current++;
@@ -69,13 +70,6 @@ export function AqlBuilder() {
   function clear() {
     setQuery('');
     setRun({ kind: 'idle' });
-  }
-
-  function onEditorKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      execute();
-    }
   }
 
   return (
@@ -111,15 +105,7 @@ export function AqlBuilder() {
         </div>
       )}
 
-      <textarea
-        className="editor"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={onEditorKeyDown}
-        spellCheck={false}
-        placeholder='items.find({"repo": "my-repo"})'
-        aria-label="AQL query"
-      />
+      <AqlEditor value={query} onChange={setQuery} onExecute={execute} />
 
       <ResultsPane run={run} />
     </div>

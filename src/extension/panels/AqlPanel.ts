@@ -122,10 +122,14 @@ function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
     webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', file)).toString();
   const csp = [
     "default-src 'none'",
-    `style-src ${webview.cspSource}`,
+    // Monaco injects <style> elements at runtime (theme colors, decorations).
+    `style-src ${webview.cspSource} 'unsafe-inline'`,
     `font-src ${webview.cspSource}`,
     `img-src ${webview.cspSource} data:`,
     `script-src 'nonce-${nonce}'`,
+    // The Monaco worker script is fetched and then started from a blob: URL.
+    `connect-src ${webview.cspSource}`,
+    'worker-src blob:',
   ].join('; ');
 
   return `<!DOCTYPE html>
@@ -138,7 +142,7 @@ function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
   <title>AQL Manager</title>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root" data-monaco-worker-url="${asset('editor.worker.js')}"></div>
   <script nonce="${nonce}" src="${asset('webview.js')}"></script>
 </body>
 </html>`;
