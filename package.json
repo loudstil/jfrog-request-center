@@ -3,8 +3,18 @@
   "displayName": "JFrog Request Center",
   "description": "Write and run AQL queries and explore JFrog REST APIs without leaving VS Code.",
   "version": "0.1.0",
-  "publisher": "local-dev",
+  "publisher": "loudstil",
   "private": true,
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/loudstil/jfrog-request-center.git"
+  },
+  "bugs": {
+    "url": "https://github.com/loudstil/jfrog-request-center/issues"
+  },
+  "homepage": "https://github.com/loudstil/jfrog-request-center#readme",
   "engines": {
     "vscode": "^1.95.0"
   },
@@ -293,7 +303,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production",
-    "package": "vsce package --no-dependencies --allow-missing-repository --skip-license"
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -3,6 +3,9 @@
 Write and run AQL (Artifactory Query Language) queries and call JFrog Platform REST APIs
 without leaving VS Code.
 
+> This is an independent, community-built extension. It is not affiliated with, endorsed by, or
+> supported by JFrog Ltd. JFrog and Artifactory are trademarks of JFrog Ltd.
+
 - **AQL Manager**: an AQL editor with syntax highlighting and autocomplete, and a results table
   that stays fast with very large results.
 - **Saved queries**: keep the queries you use often, synced across machines with Settings Sync.
@@ -131,6 +134,11 @@ All commands are in the Command Palette under **JFrog Request Center**:
   `http.systemCertificates` settings. **Show Logs** shows the underlying error.
 - **Rate limited (429)**: requests are retried automatically up to two times, following the
   server's `Retry-After` header. If it still fails, wait a moment and try again.
+
+## Feedback
+
+Bugs and feature requests:
+[github.com/loudstil/jfrog-request-center/issues](https://github.com/loudstil/jfrog-request-center/issues).
 
 ## Requirements
 
