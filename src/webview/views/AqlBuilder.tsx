@@ -3,12 +3,15 @@ import type { AqlRange } from '../../shared/aql';
 import type { SavedQueryRef } from '../../shared/messages';
 import { AqlEditor } from '../components/AqlEditor';
 import { ResultsGrid } from '../components/ResultsGrid';
+import { SplitPane } from '../components/SplitPane';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from '../utils/vscode';
 
 const DEFAULT_QUERY = `items.find({
   "repo": "my-local-repo",
   "name": {"$match": "*.jar"}
 }).include("name", "repo", "path", "created").limit(50)`;
+
+const DEFAULT_EDITOR_RATIO = 0.4;
 
 type RunState =
   | { kind: 'idle' }
@@ -21,6 +24,7 @@ export function AqlBuilder() {
   const [query, setQuery] = useState(initial?.query ?? DEFAULT_QUERY);
   const [savedQuery, setSavedQuery] = useState<SavedQueryRef | undefined>(initial?.savedQuery);
   const [baseline, setBaseline] = useState(initial?.baseline ?? DEFAULT_QUERY);
+  const [editorRatio, setEditorRatio] = useState(initial?.editorRatio ?? DEFAULT_EDITOR_RATIO);
   // The latest list of saved queries from the extension; undefined until it arrives.
   const [knownQueries, setKnownQueries] = useState<SavedQueryRef[] | undefined>(undefined);
   const [run, setRun] = useState<RunState>({ kind: 'idle' });
@@ -83,8 +87,8 @@ export function AqlBuilder() {
   const dirty = query !== baseline && (savedQuery !== undefined || query.trim() !== '');
 
   useEffect(
-    () => setPersistedState({ query, savedQuery, baseline }),
-    [query, savedQuery, baseline],
+    () => setPersistedState({ query, savedQuery, baseline, editorRatio }),
+    [query, savedQuery, baseline, editorRatio],
   );
   useEffect(
     () => postMessage({ type: 'editorState', savedQueryId: savedQuery?.id, dirty }),
@@ -181,9 +185,16 @@ export function AqlBuilder() {
         </div>
       )}
 
-      <AqlEditor value={query} onChange={setQuery} onExecute={execute} onSave={save} />
-
-      <ResultsPane run={run} />
+      <SplitPane
+        top={<AqlEditor value={query} onChange={setQuery} onExecute={execute} onSave={save} />}
+        bottom={<ResultsPane run={run} />}
+        ratio={editorRatio}
+        onRatioChange={setEditorRatio}
+        defaultRatio={DEFAULT_EDITOR_RATIO}
+        minTopPx={80}
+        minBottomPx={100}
+        label="Resize the editor and results"
+      />
     </div>
   );
 }

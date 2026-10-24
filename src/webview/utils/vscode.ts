@@ -16,6 +16,8 @@ export interface PersistedState {
   savedQuery?: SavedQueryRef;
   /** The text the query had when it was last saved or loaded; used to detect unsaved changes. */
   baseline?: string;
+  /** Share of the height given to the editor; the results get the rest. */
+  editorRatio?: number;
 }
 
 // acquireVsCodeApi may only be called once per webview.
