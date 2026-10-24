@@ -3,6 +3,7 @@ import * as monaco from 'monaco-editor/editor/editor.api';
 // Every editor feature (suggest, find, bracket matching, ...) but none of the built-in languages.
 import 'monaco-editor/features/register.all';
 import { AQL_LANGUAGE_ID, aqlTokenRules, registerAqlLanguage } from '../aql/aqlLanguage';
+import { registerJsonLanguage } from './jsonLanguage';
 
 export { monaco, AQL_LANGUAGE_ID };
 
@@ -80,6 +81,7 @@ function applyVsCodeTheme(): void {
 }
 
 registerAqlLanguage(monaco);
+registerJsonLanguage(monaco);
 applyVsCodeTheme();
 // VS Code toggles body classes (vscode-light, vscode-dark, ...) when the user switches themes.
 new MutationObserver(applyVsCodeTheme).observe(document.body, {

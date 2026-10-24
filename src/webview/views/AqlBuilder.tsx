@@ -1,7 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
 import type { SavedQueryRef } from '../../shared/messages';
-import { AqlEditor } from '../components/AqlEditor';
+import { CodeEditor } from '../components/CodeEditor';
 import { ResultsGrid } from '../components/ResultsGrid';
 import {
   filterRows,
@@ -21,6 +21,16 @@ const DEFAULT_QUERY = `items.find({
 
 const DEFAULT_EDITOR_RATIO = 0.4;
 
+interface AqlPersistedState {
+  query: string;
+  /** The saved query being edited, if any. */
+  savedQuery?: SavedQueryRef;
+  /** The text the query had when it was last saved or loaded; used to detect unsaved changes. */
+  baseline?: string;
+  /** Share of the height given to the editor; the results get the rest. */
+  editorRatio?: number;
+}
+
 type RunState =
   | { kind: 'idle' }
   | { kind: 'running'; requestId: number }
@@ -28,7 +38,7 @@ type RunState =
   | { kind: 'done'; rows: Record<string, unknown>[]; range?: AqlRange; elapsedMs: number };
 
 export function AqlBuilder() {
-  const [initial] = useState(getPersistedState);
+  const [initial] = useState(getPersistedState<AqlPersistedState>);
   const [query, setQuery] = useState(initial?.query ?? DEFAULT_QUERY);
   const [savedQuery, setSavedQuery] = useState<SavedQueryRef | undefined>(initial?.savedQuery);
   const [baseline, setBaseline] = useState(initial?.baseline ?? DEFAULT_QUERY);
@@ -95,7 +105,7 @@ export function AqlBuilder() {
   const dirty = query !== baseline && (savedQuery !== undefined || query.trim() !== '');
 
   useEffect(
-    () => setPersistedState({ query, savedQuery, baseline, editorRatio }),
+    () => setPersistedState<AqlPersistedState>({ query, savedQuery, baseline, editorRatio }),
     [query, savedQuery, baseline, editorRatio],
   );
   useEffect(
@@ -194,7 +204,17 @@ export function AqlBuilder() {
       )}
 
       <SplitPane
-        top={<AqlEditor value={query} onChange={setQuery} onExecute={execute} onSave={save} />}
+        top={
+          <CodeEditor
+            value={query}
+            onChange={setQuery}
+            language="aql"
+            ariaLabel="AQL query"
+            onExecute={execute}
+            onSave={save}
+            autoFocus
+          />
+        }
         bottom={<ResultsPane run={run} />}
         ratio={editorRatio}
         onRatioChange={setEditorRatio}

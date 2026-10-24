@@ -1,17 +1,29 @@
 import { useEffect, useRef } from 'react';
-import { AQL_LANGUAGE_ID, monaco, THEME_NAME } from '../monaco/setup';
+import { monaco, THEME_NAME } from '../monaco/setup';
 
-interface AqlEditorProps {
+interface CodeEditorProps {
   value: string;
   onChange: (value: string) => void;
+  /** A language registered in monaco/setup.ts, e.g. "aql", "json" or "plaintext". */
+  language: string;
+  ariaLabel: string;
   /** Called on Ctrl/Cmd+Enter. */
-  onExecute: () => void;
+  onExecute?: () => void;
   /** Called on Ctrl/Cmd+S. */
-  onSave: () => void;
+  onSave?: () => void;
+  autoFocus?: boolean;
 }
 
-/** A Monaco editor for AQL that follows the VS Code theme and editor font. */
-export function AqlEditor({ value, onChange, onExecute, onSave }: AqlEditorProps) {
+/** A Monaco editor that follows the VS Code theme and editor font. */
+export function CodeEditor({
+  value,
+  onChange,
+  language,
+  ariaLabel,
+  onExecute,
+  onSave,
+  autoFocus = false,
+}: CodeEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
   // Monaco callbacks are registered once, so route them through refs to the latest props.
@@ -28,9 +40,9 @@ export function AqlEditor({ value, onChange, onExecute, onSave }: AqlEditorProps
     const style = getComputedStyle(document.documentElement);
     const editor = monaco.editor.create(containerRef.current!, {
       value,
-      language: AQL_LANGUAGE_ID,
+      language,
       theme: THEME_NAME,
-      ariaLabel: 'AQL query',
+      ariaLabel,
       automaticLayout: true,
       fixedOverflowWidgets: true,
       fontFamily: style.getPropertyValue('--vscode-editor-font-family').trim() || undefined,
@@ -42,13 +54,15 @@ export function AqlEditor({ value, onChange, onExecute, onSave }: AqlEditorProps
       tabSize: 2,
       wordBasedSuggestions: 'off',
     });
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onExecuteRef.current());
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current());
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onExecuteRef.current?.());
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current?.());
     const subscription = editor.onDidChangeModelContent(() =>
       onChangeRef.current(editor.getValue()),
     );
     editorRef.current = editor;
-    editor.focus();
+    if (autoFocus) {
+      editor.focus();
+    }
 
     return () => {
       subscription.dispose();
@@ -58,6 +72,13 @@ export function AqlEditor({ value, onChange, onExecute, onSave }: AqlEditorProps
     };
     // Created once with the initial value; later changes are synced by the effect below.
   }, []);
+
+  useEffect(() => {
+    const model = editorRef.current?.getModel();
+    if (model && model.getLanguageId() !== language) {
+      monaco.editor.setModelLanguage(model, language);
+    }
+  }, [language]);
 
   // Sync changes made outside the editor, e.g. the Clear button.
   useEffect(() => {

@@ -1,6 +1,9 @@
 import { AqlBuilder } from './views/AqlBuilder';
+import { RequestForm } from './views/RequestForm';
 
-// Only one view for now; the REST request panel (Phase 4) will add routing here.
+// The extension tells us which view this panel shows (see panels/webviewHtml.ts).
+const view = document.getElementById('root')?.dataset.view;
+
 export function App() {
-  return <AqlBuilder />;
+  return view === 'request' ? <RequestForm /> : <AqlBuilder />;
 }

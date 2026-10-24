@@ -1,5 +1,5 @@
 // Typed wrapper around the webview's postMessage bridge to the extension host.
-import type { ExtensionToWebview, SavedQueryRef, WebviewToExtension } from '../../shared/messages';
+import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messages';
 
 interface VsCodeApi<State> {
   postMessage(message: unknown): void;
@@ -7,21 +7,10 @@ interface VsCodeApi<State> {
   setState(state: State): void;
 }
 
-declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
-
-/** State VS Code keeps for us while the panel is hidden or moved. */
-export interface PersistedState {
-  query: string;
-  /** The saved query being edited, if any. */
-  savedQuery?: SavedQueryRef;
-  /** The text the query had when it was last saved or loaded; used to detect unsaved changes. */
-  baseline?: string;
-  /** Share of the height given to the editor; the results get the rest. */
-  editorRatio?: number;
-}
+declare function acquireVsCodeApi(): VsCodeApi<unknown>;
 
 // acquireVsCodeApi may only be called once per webview.
-const api = acquireVsCodeApi<PersistedState>();
+const api = acquireVsCodeApi();
 
 export function postMessage(message: WebviewToExtension): void {
   api.postMessage(message);
@@ -33,10 +22,11 @@ export function onMessage(handler: (message: ExtensionToWebview) => void): () =>
   return () => window.removeEventListener('message', listener);
 }
 
-export function getPersistedState(): PersistedState | undefined {
-  return api.getState();
+/** State VS Code keeps for a webview while its panel is hidden or moved. Each view has its own. */
+export function getPersistedState<State>(): State | undefined {
+  return api.getState() as State | undefined;
 }
 
-export function setPersistedState(state: PersistedState): void {
+export function setPersistedState<State>(state: State): void {
   api.setState(state);
 }

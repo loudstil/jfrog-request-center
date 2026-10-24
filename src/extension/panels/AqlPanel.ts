@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messages';
 import { errorMessage } from '../commands/connection';
@@ -6,6 +5,7 @@ import { promptForQueryName, type QueryToLoad, toRef } from '../commands/savedQu
 import type { AuthService } from '../services/authService';
 import { JFrogError, type JFrogClient } from '../services/jfrogClient';
 import type { SavedQuery, SavedQueryStore } from '../services/savedQueryStore';
+import { renderWebviewHtml } from './webviewHtml';
 
 export interface AqlPanelServices {
   client: JFrogClient;
@@ -66,7 +66,7 @@ export class AqlPanel implements vscode.Disposable {
     services: AqlPanelServices,
   ) {
     ({ client: this.client, auth: this.auth, store: this.store } = services);
-    panel.webview.html = renderHtml(panel.webview, extensionUri);
+    panel.webview.html = renderWebviewHtml(panel.webview, extensionUri, 'aql', DEFAULT_TITLE);
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: WebviewToExtension) => void this.handleMessage(msg)),
       this.auth.onDidChange(() => void this.postConnection()),
@@ -228,36 +228,4 @@ export class AqlPanel implements vscode.Disposable {
     this.disposables.forEach((d) => d.dispose());
     this.panel.dispose();
   }
-}
-
-function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-  const nonce = randomBytes(16).toString('base64');
-  const asset = (file: string) =>
-    webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', file)).toString();
-  const csp = [
-    "default-src 'none'",
-    // Monaco injects <style> elements at runtime (theme colors, decorations).
-    `style-src ${webview.cspSource} 'unsafe-inline'`,
-    `font-src ${webview.cspSource}`,
-    `img-src ${webview.cspSource} data:`,
-    `script-src 'nonce-${nonce}'`,
-    // The Monaco worker script is fetched and then started from a blob: URL.
-    `connect-src ${webview.cspSource}`,
-    'worker-src blob:',
-  ].join('; ');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="${csp}">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="${asset('webview.css')}">
-  <title>AQL Manager</title>
-</head>
-<body>
-  <div id="root" data-monaco-worker-url="${asset('editor.worker.js')}"></div>
-  <script nonce="${nonce}" src="${asset('webview.js')}"></script>
-</body>
-</html>`;
 }

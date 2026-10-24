@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
+import { registerApiExplorerCommands } from './commands/apiExplorer';
 import { clearCredentials, configureConnection } from './commands/connection';
 import { type QueryToLoad, registerSavedQueryCommands } from './commands/savedQueries';
+import { EndpointCatalog } from './explorer/endpointCatalog';
+import { RequestExecutor } from './explorer/requestExecutor';
+import { RESPONSE_SCHEME, ResponseDocuments } from './explorer/responseDocuments';
 import { AqlPanel, type AqlPanelServices } from './panels/AqlPanel';
+import { RequestPanel } from './panels/RequestPanel';
+import { ApiExplorerProvider } from './providers/ApiExplorerProvider';
 import { SavedQueriesProvider } from './providers/SavedQueriesProvider';
 import { AuthService } from './services/authService';
 import { JFrogClient } from './services/jfrogClient';
@@ -18,6 +24,13 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new SavedQueryStore(context.globalState);
   const savedQueriesProvider = new SavedQueriesProvider(store);
 
+  const catalog = new EndpointCatalog();
+  const apiExplorerProvider = new ApiExplorerProvider(catalog);
+  const responses = new ResponseDocuments();
+  const executor = new RequestExecutor(client, responses, async () => {
+    return (await auth.getConnection())?.baseUrl;
+  });
+
   const services: AqlPanelServices = { client, auth, store };
   const openAqlManager = (load?: QueryToLoad) =>
     AqlPanel.show(context.extensionUri, services, load);
@@ -30,6 +43,15 @@ export function activate(context: vscode.ExtensionContext): void {
       treeDataProvider: savedQueriesProvider,
     }),
     ...registerSavedQueryCommands(store, openAqlManager),
+    catalog,
+    apiExplorerProvider,
+    vscode.window.createTreeView('jfrogRequestCenter.apiExplorer', {
+      treeDataProvider: apiExplorerProvider,
+    }),
+    vscode.workspace.registerTextDocumentContentProvider(RESPONSE_SCHEME, responses),
+    ...registerApiExplorerCommands(catalog, executor, (endpoint) =>
+      RequestPanel.show(context.extensionUri, { auth, catalog, executor }, endpoint),
+    ),
     vscode.commands.registerCommand('jfrogRequestCenter.configure', () =>
       configureConnection(auth),
     ),
@@ -40,6 +62,7 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   void statusBar.refresh();
+  void catalog.reload();
 }
 
 export function deactivate(): void {}

@@ -1,6 +1,8 @@
-// The postMessage protocol between the extension host and the AQL Manager webview.
+// The postMessage protocol between the extension host and our webview panels
+// (AQL Manager and the API Explorer's request form).
 // Both sides import these types so they can't drift apart.
 import type { AqlRange } from './aql';
+import type { Endpoint } from './endpoints';
 
 /** Identifies a saved query without its text. */
 export interface SavedQueryRef {
@@ -18,7 +20,14 @@ export type WebviewToExtension =
   /** Save to `savedQueryId`, or prompt for a name if it's missing or `saveAs` is set. */
   | { type: 'saveQuery'; query: string; savedQueryId: string | undefined; saveAs: boolean }
   /** Sent whenever the editor's saved query or unsaved-changes state changes. */
-  | { type: 'editorState'; savedQueryId: string | undefined; dirty: boolean };
+  | { type: 'editorState'; savedQueryId: string | undefined; dirty: boolean }
+  // Request form (API Explorer):
+  | {
+      type: 'sendRequest';
+      endpointId: string;
+      values: Record<string, string>;
+      body: string | undefined;
+    };
 
 export type ExtensionToWebview =
   | { type: 'connection'; baseUrl: string | undefined }
@@ -34,4 +43,14 @@ export type ExtensionToWebview =
   | { type: 'loadQuery'; query: string; savedQuery: SavedQueryRef | undefined }
   | { type: 'querySaved'; query: string; savedQuery: SavedQueryRef }
   /** The current list of saved queries, so the webview can follow renames and deletions. */
-  | { type: 'savedQueries'; queries: SavedQueryRef[] };
+  | { type: 'savedQueries'; queries: SavedQueryRef[] }
+  // Request form (API Explorer):
+  | { type: 'showEndpoint'; endpoint: Endpoint }
+  | { type: 'requestOutcome'; endpointId: string; outcome: RequestOutcome };
+
+/** What happened to a request sent from the form. */
+export type RequestOutcome =
+  | { kind: 'sent'; status: number; statusText: string; ok: boolean; elapsedMs: number }
+  | { kind: 'invalid'; missing: string[] }
+  | { kind: 'notSent' }
+  | { kind: 'failed'; message: string; errorKind: string };

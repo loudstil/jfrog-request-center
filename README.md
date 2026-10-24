@@ -18,6 +18,15 @@ A VS Code extension for writing and running AQL (Artifactory Query Language) que
   listed in the JFrog Request Center sidebar (activity bar icon). Click one to open it, or use the
   context menu to rename or delete it. They're stored in VS Code's global state and sync with
   Settings Sync.
+- **API Explorer** (sidebar): common Artifactory and Access endpoints grouped by area, with
+  icons per HTTP method. Click an endpoint to open its request form: fields for path and query
+  parameters, a live URL preview, and a JSON body editor. Nothing is sent until you press
+  **Send**. To send an endpoint without filling in anything, use the ▶ button next to it.
+  Responses open in a read-only editor tab. Requests that may change data (POST, PUT, DELETE)
+  ask for confirmation first.
+- **Your own OpenAPI specs**: list OpenAPI 3 files (JSON or YAML), such as specs downloaded from
+  the JFrog API reference, in the `jfrogRequestCenter.openApiSpecs` setting to add their endpoints
+  to the API Explorer.
 - **Status bar**: shows whether Artifactory can be reached and which version it runs.
 
 ## Development

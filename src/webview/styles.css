@@ -357,3 +357,165 @@ body {
   outline: 1px solid var(--vscode-focusBorder);
   outline-offset: -1px;
 }
+
+/* ---- Request form (API Explorer) ---- */
+
+.request-form {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.request-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow: auto;
+}
+
+.request-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 6px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.method {
+  padding: 1px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.method-get,
+.method-head {
+  color: var(--vscode-charts-green);
+}
+
+.method-post {
+  color: var(--vscode-charts-yellow);
+}
+
+.method-put {
+  color: var(--vscode-charts-blue);
+}
+
+.method-patch {
+  color: var(--vscode-charts-purple);
+}
+
+.method-delete {
+  color: var(--vscode-charts-red);
+}
+
+.request-url {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 2px;
+  background: var(--vscode-textCodeBlock-background);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.request-section h2 {
+  margin: 18px 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.request-section h2 .muted {
+  margin-left: 6px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.param-grid {
+  display: grid;
+  grid-template-columns: minmax(100px, max-content) minmax(0, 480px);
+  gap: 8px 16px;
+  align-items: start;
+}
+
+.param-row {
+  display: contents;
+}
+
+.param-name {
+  padding-top: 4px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.required,
+.param-row.invalid .param-name {
+  color: var(--vscode-errorForeground);
+}
+
+.param-description {
+  margin-top: 3px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 3px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  font: inherit;
+}
+
+select.input {
+  border-color: var(--vscode-dropdown-border, transparent);
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+}
+
+.input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.input[aria-invalid='true'] {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
+.request-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 200px;
+}
+
+.request-body .editor {
+  flex: 1;
+  border: 1px solid var(--vscode-panel-border);
+}
+
+.outcome {
+  font-size: 12px;
+}
+
+.outcome-ok {
+  color: var(--vscode-testing-iconPassed, var(--vscode-charts-green));
+}
+
+.outcome-error {
+  color: var(--vscode-errorForeground);
+}

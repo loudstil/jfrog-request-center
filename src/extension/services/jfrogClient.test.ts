@@ -124,6 +124,39 @@ describe('JFrogClient', () => {
     expect(err.message).toContain('ENOTFOUND');
   });
 
+  it('send() returns error responses instead of throwing', async () => {
+    const fetchFn = mockFetch(
+      new Response('{"errors":[{"status":404,"message":"Not here"}]}', {
+        status: 404,
+        statusText: 'Not Found',
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const response = await JFrogClient.forConnection(connection, fetchFn).send(
+      'GET',
+      '/artifactory/api/repositories/missing',
+    );
+    expect(response).toMatchObject({
+      url: 'https://acme.jfrog.io/artifactory/api/repositories/missing',
+      status: 404,
+      statusText: 'Not Found',
+      ok: false,
+      contentType: 'application/json',
+      body: '{"errors":[{"status":404,"message":"Not here"}]}',
+    });
+    expect(response.elapsedMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('send() still throws for network failures', async () => {
+    const err = await catchError(
+      JFrogClient.forConnection(connection, mockFetch(new TypeError('fetch failed'))).send(
+        'GET',
+        '/x',
+      ),
+    );
+    expect(err.kind).toBe('network');
+  });
+
   it('reports cancellation when the caller aborts', async () => {
     const controller = new AbortController();
     const fetchFn = vi.fn<typeof fetch>(async () => {

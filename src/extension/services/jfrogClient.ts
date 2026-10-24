@@ -41,6 +41,17 @@ export interface RequestOptions {
   signal?: AbortSignal;
 }
 
+/** A completed HTTP exchange, whatever its status. */
+export interface RawResponse {
+  url: string;
+  status: number;
+  statusText: string;
+  ok: boolean;
+  contentType: string;
+  body: string;
+  elapsedMs: number;
+}
+
 export interface VersionInfo {
   version: string;
   revision: string;
@@ -68,7 +79,21 @@ export class JFrogClient {
     return new JFrogClient(async () => connection, fetchFn);
   }
 
+  /** Sends a request and parses the response; non-2xx statuses throw a JFrogError. */
   async request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+    const response = await this.send(method, path, options);
+    if (!response.ok) {
+      throw toHttpError(response);
+    }
+    const isJson = response.contentType.includes('json');
+    return (isJson && response.body ? JSON.parse(response.body) : response.body) as T;
+  }
+
+  /**
+   * Sends a request and returns the raw response, including 4xx/5xx ones (for showing them to
+   * the user). Only a missing connection, network failures, timeouts and cancellation throw.
+   */
+  async send(method: string, path: string, options: RequestOptions = {}): Promise<RawResponse> {
     const connection = await this.getConnection();
     if (!connection) {
       throw new JFrogError('notConfigured', 'JFrog connection is not configured.');
@@ -97,20 +122,21 @@ export class JFrogClient {
     const timeout = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
     const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
 
-    let response: Response;
+    const started = Date.now();
     try {
-      response = await this.fetchFn(url, { method, headers, body, signal });
+      const response = await this.fetchFn(url, { method, headers, body, signal });
+      return {
+        url: url.toString(),
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        contentType: response.headers.get('content-type') ?? '',
+        body: await response.text(),
+        elapsedMs: Date.now() - started,
+      };
     } catch (err) {
       throw toRequestError(err, url, options.signal);
     }
-
-    if (!response.ok) {
-      throw await toHttpError(response);
-    }
-
-    const text = await response.text();
-    const isJson = response.headers.get('content-type')?.includes('json');
-    return (isJson && text ? JSON.parse(text) : text) as T;
   }
 
   ping(): Promise<string> {
@@ -149,8 +175,8 @@ function toRequestError(err: unknown, url: URL, callerSignal: AbortSignal | unde
   return new JFrogError('network', `Could not reach ${url.host}: ${detail}`);
 }
 
-async function toHttpError(response: Response): Promise<JFrogError> {
-  const detail = extractErrorDetail(await response.text().catch(() => ''));
+function toHttpError(response: RawResponse): JFrogError {
+  const detail = extractErrorDetail(response.body);
   const status = response.status;
   const suffix = detail ? `: ${detail}` : '';
 
