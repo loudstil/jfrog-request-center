@@ -1,49 +1,139 @@
 # JFrog Request Center
 
-A VS Code extension for writing and running AQL (Artifactory Query Language) queries, and
-(coming in Phase 4) exploring JFrog REST APIs, without leaving the editor.
+Write and run AQL (Artifactory Query Language) queries and call JFrog Platform REST APIs
+without leaving VS Code.
 
-## Features (so far)
+- **AQL Manager**: an AQL editor with syntax highlighting and autocomplete, and a results table
+  that stays fast with very large results.
+- **Saved queries**: keep the queries you use often, synced across machines with Settings Sync.
+- **API Explorer**: browse common Artifactory and Access endpoints, fill in a form, and read the
+  response in an editor tab. Add your own OpenAPI specs for more endpoints.
+- **Multiple servers**: keep several JFrog Platforms (for example dev, staging and production)
+  and switch between them in one click.
 
-- **JFrog Request Center: Configure Connection**: enter your platform URL, an optional
-  username and an access token. The connection is checked before saving, and the token is
-  stored in VS Code's SecretStorage (your OS keychain), never in settings.
-- **JFrog Request Center: Open AQL Manager**: write a query in a Monaco editor with AQL
-  syntax highlighting and autocomplete (domains, methods, fields for the queried domain, and `$`
-  operators), run it with **Execute AQL** or Ctrl/Cmd+Enter, and see the results in a table that
-  handles large results smoothly: click a header to sort, type in the filter box to search all
-  columns, and drag a header edge to resize a column. Copy or open the shown rows as JSON. Drag
-  the divider to resize the editor and results. The editor follows your VS Code theme and font.
-- **Saved queries**: **Save** (Ctrl/Cmd+S) and **Save As…** in the AQL Manager. Saved queries are
-  listed in the JFrog Request Center sidebar (activity bar icon). Click one to open it, or use the
-  context menu to rename or delete it. They're stored in VS Code's global state and sync with
-  Settings Sync.
-- **API Explorer** (sidebar): common Artifactory and Access endpoints grouped by area, with
-  icons per HTTP method. Click an endpoint to open its request form: fields for path and query
-  parameters, a live URL preview, and a JSON body editor. Nothing is sent until you press
-  **Send**. To send an endpoint without filling in anything, use the ▶ button next to it.
-  Responses open in a read-only editor tab. Requests that may change data (POST, PUT, DELETE)
-  ask for confirmation first.
-- **Your own OpenAPI specs**: list OpenAPI 3 files (JSON or YAML), such as specs downloaded from
-  the JFrog API reference, in the `jfrogRequestCenter.openApiSpecs` setting to add their endpoints
-  to the API Explorer.
-- **Status bar**: shows whether Artifactory can be reached and which version it runs.
+## Getting started
 
-## Development
+1. Open the Command Palette (Ctrl/Cmd+Shift+P) and run **JFrog Request Center: Add Server**.
+2. Enter your JFrog Platform URL (for example `https://mycompany.jfrog.io`), a name for the
+   server, an optional username, and an access token. The connection is verified before it's
+   saved.
+3. The status bar shows the active server's name once you're connected.
 
-```sh
-npm install
-npm run build      # bundle dist/extension.js and dist/webview.js
-npm run watch      # rebuild on change
-npm test           # unit tests (Vitest)
-npm run typecheck  # extension + webview
-npm run lint
+The JFrog Request Center icon in the activity bar opens the **Servers**, **API Explorer** and
+**Saved Queries** views.
+
+## Multiple servers
+
+- Add as many servers as you like with **Add Server** or the **+** in the Servers view.
+- **Switch** by clicking the server name in the status bar, clicking a server in the Servers view,
+  clicking the server badge in the AQL Manager or a request form, or running **Switch Server**.
+  The active server is marked in the Servers view.
+- Everything runs against the active server. Confirmations for requests that may change data
+  name the server they'll be sent to.
+- Each server has its own access token. Right-click a server to edit it, clear its token, or
+  remove it.
+- Server names, URLs and usernames are stored in the `jfrogRequestCenter.servers` setting, so a
+  team can share a list in a workspace's `.vscode/settings.json`. Tokens are never stored in
+  settings: switching to a server without a token asks for one.
+
+## AQL Manager
+
+Run **JFrog Request Center: Open AQL Manager**, or click the status bar item.
+
+- **Editor**: AQL highlighting, bracket matching, and autocomplete for domains (`items`,
+  `builds`, ...), methods (`find`, `include`, `sort`, `limit`, ...), the fields of the domain
+  you're querying, and `$` operators (`$match`, `$last`, ...).
+- **Run**: **Execute AQL** or Ctrl/Cmd+Enter. A running query can be cancelled.
+- **Results**: click a column header to sort, type in the filter box to search all columns, and
+  drag a header edge to resize a column (double-click to reset). **Copy JSON** and **Open as
+  JSON** use the rows currently shown.
+- **Layout**: drag the divider between the editor and the results; double-click it to reset.
+
+## Saved queries
+
+- **Save** (Ctrl/Cmd+S) and **Save As…** in the AQL Manager. A ● next to the name means there
+  are unsaved changes.
+- Saved queries are listed in the sidebar. Click one to open it; right-click to rename or
+  delete it. **+** starts a new query.
+- You're asked before unsaved changes are discarded.
+
+## API Explorer
+
+- Endpoints are grouped by area: Repositories, Artifacts & Storage, Searches, Builds, Security &
+  Access, and System. Icons show the HTTP method.
+- **Click** an endpoint to open its request form: path and query parameters, a live preview of
+  the URL, and a body editor where the endpoint takes one. Nothing is sent until you press
+  **Send** (Ctrl/Cmd+Enter).
+- **▶** next to an endpoint sends it right away when it needs no input.
+- Responses, including error responses, open in a read-only editor tab with the status and
+  timing at the top.
+- Requests that may change data (POST, PUT, PATCH, DELETE) always ask for confirmation and show
+  the exact URL first.
+
+### Adding OpenAPI specs
+
+JFrog publishes OpenAPI specs in its API reference. To add their endpoints to the explorer, list
+the downloaded files (JSON or YAML, OpenAPI 3) in your settings:
+
+```json
+"jfrogRequestCenter.openApiSpecs": [
+  "~/specs/artifactory-repositories.yaml",
+  "specs/access.json"
+]
 ```
 
-Press **F5** in VS Code to launch an Extension Development Host with the extension loaded.
+Relative paths are resolved against the first workspace folder. After editing a spec file, click
+**↻** in the API Explorer title bar.
 
-- `src/extension/`: extension host code (Node): commands, services, panels
-- `src/webview/`: React UI rendered inside the AQL Manager panel
-  - `src/webview/aql/`: the AQL language (highlighting rules and completions)
-  - `src/webview/monaco/setup.ts`: Monaco setup: editor features, worker, theme sync
-- `src/shared/`: types used by both sides, including the postMessage protocol
+## Settings
+
+| Setting                           | Description                                                                                                                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `jfrogRequestCenter.servers`      | The servers you can switch between: `name`, `url`, and an optional `username` (when set, the token is sent with Basic auth; otherwise as a Bearer token). Tokens are kept in the OS keychain, not here. |
+| `jfrogRequestCenter.openApiSpecs` | OpenAPI 3 files whose endpoints are added to the API Explorer.                                                                                                                                          |
+
+## Commands
+
+All commands are in the Command Palette under **JFrog Request Center**:
+
+| Command                             | What it does                                                  |
+| ----------------------------------- | ------------------------------------------------------------- |
+| Switch Server…                      | Pick the active server, or add or edit one.                   |
+| Add Server… / Edit Server…          | Set a server's URL, name, username and access token.          |
+| Remove Server…                      | Remove a server and its stored token.                         |
+| Configure Active Server             | Edit the active server (or add the first one).                |
+| Clear Access Token                  | Remove the active server's stored token.                      |
+| Open AQL Manager                    | Open the AQL editor.                                          |
+| New AQL Query                       | Start a new, unsaved query.                                   |
+| Open / Rename / Delete Saved Query… | Pick a saved query from a list.                               |
+| Send API Request…                   | Search all endpoints and send one.                            |
+| Open Request Form…                  | Search all endpoints and open one's form.                     |
+| Copy Endpoint Path                  | Copy an endpoint's path (from the API Explorer context menu). |
+| Reload OpenAPI Specs                | Re-read the files in `openApiSpecs`.                          |
+| Show Logs                           | Open the request log in the Output panel.                     |
+
+## Security and privacy
+
+- Access tokens are stored only in VS Code's SecretStorage (your operating system's keychain),
+  one per server, never in settings files. **Clear Access Token** or **Remove Server** deletes
+  them.
+- The request log (**Show Logs**) records the method, URL, status and timing of each request.
+  It never contains the token, other headers, or request and response bodies.
+- The extension talks only to the JFrog servers you configure. It collects no telemetry.
+
+## Troubleshooting
+
+- **Authentication failed (401)**: check which server is active, then run **Configure Active
+  Server** to enter a new token. If you set a username,
+  the token is sent with Basic auth; leave the username empty to send it as a Bearer token.
+- **Could not reach the server**: check the URL and your network. Behind a corporate proxy or
+  with a private certificate authority, check VS Code's `http.proxy`, `http.proxySupport` and
+  `http.systemCertificates` settings. **Show Logs** shows the underlying error.
+- **Rate limited (429)**: requests are retried automatically up to two times, following the
+  server's `Retry-After` header. If it still fails, wait a moment and try again.
+
+## Requirements
+
+- VS Code 1.95 or later.
+- A JFrog Platform or Artifactory instance, and an access token with the permissions the calls
+  you make need. Some endpoints, such as System Info and Storage Summary, require an admin.

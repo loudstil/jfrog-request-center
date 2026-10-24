@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import type { SavedQueryRef } from '../../shared/messages';
 import type { SavedQuery, SavedQueryStore } from '../services/savedQueryStore';
-import { errorMessage } from './connection';
+import { errorMessage } from '../errors';
 
 /** What to show in the AQL Manager. */
 export interface QueryToLoad {

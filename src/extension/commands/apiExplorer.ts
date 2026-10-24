@@ -27,14 +27,17 @@ export function registerApiExplorerCommands(
         }
         const outcome = await executor.execute(endpoint, {}, undefined);
         if (outcome.kind === 'failed' && outcome.errorKind !== 'cancelled') {
+          const authProblem =
+            outcome.errorKind === 'notConfigured' || outcome.errorKind === 'unauthorized';
           const choice = await vscode.window.showErrorMessage(
             `${endpoint.name}: ${outcome.message}`,
-            ...(outcome.errorKind === 'notConfigured' || outcome.errorKind === 'unauthorized'
-              ? ['Configure Connection']
-              : []),
+            ...(authProblem ? ['Configure Connection'] : []),
+            'Show Logs',
           );
-          if (choice) {
+          if (choice === 'Configure Connection') {
             await vscode.commands.executeCommand('jfrogRequestCenter.configure');
+          } else if (choice === 'Show Logs') {
+            await vscode.commands.executeCommand('jfrogRequestCenter.showLogs');
           }
         }
       },

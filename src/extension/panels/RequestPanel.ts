@@ -3,11 +3,11 @@ import type { Endpoint } from '../../shared/endpoints';
 import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messages';
 import type { EndpointCatalog } from '../explorer/endpointCatalog';
 import type { RequestExecutor } from '../explorer/requestExecutor';
-import type { AuthService } from '../services/authService';
+import type { ServerManager } from '../services/serverManager';
 import { renderWebviewHtml } from './webviewHtml';
 
 export interface RequestPanelServices {
-  auth: AuthService;
+  servers: ServerManager;
   catalog: EndpointCatalog;
   executor: RequestExecutor;
 }
@@ -48,7 +48,7 @@ export class RequestPanel implements vscode.Disposable {
     panel.webview.html = renderWebviewHtml(panel.webview, extensionUri, 'request', DEFAULT_TITLE);
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: WebviewToExtension) => void this.handleMessage(msg)),
-      services.auth.onDidChange(() => void this.postConnection()),
+      services.servers.onDidChange(() => void this.postConnection()),
       panel.onDidDispose(() => this.dispose()),
     );
   }
@@ -74,6 +74,9 @@ export class RequestPanel implements vscode.Disposable {
       case 'configure':
         await vscode.commands.executeCommand('jfrogRequestCenter.configure');
         break;
+      case 'switchServer':
+        await vscode.commands.executeCommand('jfrogRequestCenter.switchServer');
+        break;
       case 'sendRequest': {
         const endpoint = this.services.catalog.get(msg.endpointId);
         const outcome = endpoint
@@ -90,8 +93,12 @@ export class RequestPanel implements vscode.Disposable {
   }
 
   private async postConnection(): Promise<void> {
-    const connection = await this.services.auth.getConnection();
-    this.post({ type: 'connection', baseUrl: connection?.baseUrl });
+    const connection = await this.services.servers.getConnection();
+    this.post({
+      type: 'connection',
+      baseUrl: connection?.baseUrl,
+      serverName: connection?.name,
+    });
   }
 
   private post(msg: ExtensionToWebview): void {

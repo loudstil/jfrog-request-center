@@ -13,6 +13,7 @@ export interface SavedQueryRef {
 export type WebviewToExtension =
   | { type: 'ready' }
   | { type: 'configure' }
+  | { type: 'switchServer' }
   | { type: 'executeAql'; requestId: number; query: string }
   | { type: 'cancelAql'; requestId: number }
   | { type: 'copyToClipboard'; text: string }
@@ -30,7 +31,8 @@ export type WebviewToExtension =
     };
 
 export type ExtensionToWebview =
-  | { type: 'connection'; baseUrl: string | undefined }
+  /** The active server. `baseUrl` is undefined when no server (or no token) is configured. */
+  | { type: 'connection'; baseUrl: string | undefined; serverName: string | undefined }
   | {
       type: 'aqlResult';
       requestId: number;

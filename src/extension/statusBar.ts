@@ -1,49 +1,62 @@
 import * as vscode from 'vscode';
-import { errorMessage } from './commands/connection';
-import type { AuthService } from './services/authService';
+import { errorMessage } from './errors';
 import type { JFrogClient } from './services/jfrogClient';
+import type { ServerManager } from './services/serverManager';
 
-/** Shows whether we can reach Artifactory, and its version, in the status bar. */
+/** Shows the active server and whether it can be reached. Click to switch servers. */
 export class ConnectionStatusBar implements vscode.Disposable {
   private readonly item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
   private readonly subscription: vscode.Disposable;
-  // Saving a connection fires several change events; only the latest refresh may update the UI.
+  // Saving a server fires several change events; only the latest refresh may update the UI.
   private generation = 0;
 
   constructor(
-    private readonly auth: AuthService,
+    private readonly servers: ServerManager,
     private readonly client: JFrogClient,
   ) {
-    this.item.name = 'JFrog Connection';
+    this.item.name = 'JFrog Server';
     this.item.show();
-    this.subscription = auth.onDidChange(() => void this.refresh());
+    this.subscription = servers.onDidChange(() => void this.refresh());
   }
 
   async refresh(): Promise<void> {
     const generation = ++this.generation;
-    const connection = await this.auth.getConnection();
+    const server = this.servers.activeServer();
+    const connection = await this.servers.getConnection();
     if (generation !== this.generation) {
       return;
     }
 
+    if (!server) {
+      this.update('$(plug) JFrog: Add Server', 'No JFrog server is configured', 'addServer');
+      return;
+    }
     if (!connection) {
-      this.update('$(plug) JFrog: Not configured', 'Click to configure', 'configure');
+      this.update(
+        `$(key) ${server.name}`,
+        `${server.url}\nNo access token. Click to switch servers or sign in.`,
+        'switchServer',
+      );
       return;
     }
 
-    this.update('$(sync~spin) JFrog', `Connecting to ${connection.baseUrl}…`, 'configure');
+    this.update(`$(sync~spin) ${server.name}`, `Connecting to ${server.url}…`, 'switchServer');
     try {
       const { version } = await this.client.version();
       if (generation === this.generation) {
         this.update(
-          `$(check) Artifactory ${version}`,
-          `Connected to ${connection.baseUrl}\nClick to open the AQL Manager`,
-          'openAqlManager',
+          `$(server) ${server.name}`,
+          `${server.url}\nArtifactory ${version}\nClick to switch servers`,
+          'switchServer',
         );
       }
     } catch (err) {
       if (generation === this.generation) {
-        this.update('$(warning) JFrog', `${errorMessage(err)}\nClick to reconfigure`, 'configure');
+        this.update(
+          `$(warning) ${server.name}`,
+          `${server.url}\n${errorMessage(err)}\nClick to switch or edit servers`,
+          'switchServer',
+        );
       }
     }
   }

@@ -2,6 +2,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
 import type { SavedQueryRef } from '../../shared/messages';
 import { CodeEditor } from '../components/CodeEditor';
+import { ServerBadge } from '../components/ServerBadge';
 import { ResultsGrid } from '../components/ResultsGrid';
 import {
   filterRows,
@@ -48,6 +49,7 @@ export function AqlBuilder() {
   const [run, setRun] = useState<RunState>({ kind: 'idle' });
   // undefined = not configured, null = not known yet.
   const [baseUrl, setBaseUrl] = useState<string | undefined | null>(null);
+  const [serverName, setServerName] = useState<string | undefined>(undefined);
   const nextRequestId = useRef(1);
   const activeRequestId = useRef<number | undefined>(undefined);
 
@@ -56,6 +58,7 @@ export function AqlBuilder() {
       switch (msg.type) {
         case 'connection':
           setBaseUrl(msg.baseUrl);
+          setServerName(msg.serverName);
           break;
         case 'aqlResult':
           if (msg.requestId === activeRequestId.current) {
@@ -191,14 +194,14 @@ export function AqlBuilder() {
           </span>
         )}
         <span className="spacer" />
-        {baseUrl && <span className="muted">{baseUrl}</span>}
+        {baseUrl && <ServerBadge name={serverName} url={baseUrl} />}
       </div>
 
       {baseUrl === undefined && (
         <div className="banner">
-          No JFrog connection is configured.{' '}
+          No JFrog server is set up, or it has no access token.{' '}
           <button className="link" onClick={() => postMessage({ type: 'configure' })}>
-            Configure connection
+            Set up a server
           </button>
         </div>
       )}

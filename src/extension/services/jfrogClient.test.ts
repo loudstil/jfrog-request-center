@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { type Connection, JFrogClient, JFrogError, normalizeBaseUrl } from './jfrogClient';
+import {
+  type Connection,
+  JFrogClient,
+  JFrogError,
+  normalizeBaseUrl,
+  retryDelayMs,
+} from './jfrogClient';
 
 const connection: Connection = { baseUrl: 'https://acme.jfrog.io', token: 'secret-token' };
 
@@ -8,8 +14,14 @@ function mockFetch(response: Response | Error) {
     if (response instanceof Error) {
       throw response;
     }
-    return response;
+    // A fresh copy per call, since a retried request reads the response again.
+    return response.clone();
   });
+}
+
+/** Test client options: the given fetch, and no real waiting between retries. */
+function opts(fetchFn: typeof fetch, sleep = async () => {}) {
+  return { fetchFn, sleep };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -43,7 +55,7 @@ describe('normalizeBaseUrl', () => {
 describe('JFrogClient', () => {
   it('sends the token as a Bearer token when no username is set', async () => {
     const fetchFn = mockFetch(new Response('OK', { headers: { 'Content-Type': 'text/plain' } }));
-    const result = await JFrogClient.forConnection(connection, fetchFn).ping();
+    const result = await JFrogClient.forConnection(connection, opts(fetchFn)).ping();
 
     expect(result).toBe('OK');
     const [url, init] = fetchFn.mock.calls[0];
@@ -53,7 +65,7 @@ describe('JFrogClient', () => {
 
   it('uses Basic auth when a username is set', async () => {
     const fetchFn = mockFetch(jsonResponse({ version: '7.90.0', revision: '1' }));
-    await JFrogClient.forConnection({ ...connection, username: 'alice' }, fetchFn).version();
+    await JFrogClient.forConnection({ ...connection, username: 'alice' }, opts(fetchFn)).version();
 
     const headers = fetchFn.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers.Authorization).toBe(`Basic ${btoa('alice:secret-token')}`);
@@ -64,7 +76,7 @@ describe('JFrogClient', () => {
     const fetchFn = mockFetch(jsonResponse(body));
     const query = 'items.find({"repo":"libs"})';
 
-    const result = await JFrogClient.forConnection(connection, fetchFn).aql(query);
+    const result = await JFrogClient.forConnection(connection, opts(fetchFn)).aql(query);
 
     expect(result).toEqual(body);
     const [url, init] = fetchFn.mock.calls[0];
@@ -76,7 +88,7 @@ describe('JFrogClient', () => {
 
   it('serializes object bodies as JSON and adds query parameters', async () => {
     const fetchFn = mockFetch(jsonResponse({}));
-    await JFrogClient.forConnection(connection, fetchFn).request('PUT', 'artifactory/api/x', {
+    await JFrogClient.forConnection(connection, opts(fetchFn)).request('PUT', 'artifactory/api/x', {
       body: { key: 'value' },
       query: { recursive: 1, skip: undefined },
     });
@@ -89,7 +101,7 @@ describe('JFrogClient', () => {
 
   it('fails with notConfigured when there is no connection', async () => {
     const fetchFn = mockFetch(jsonResponse({}));
-    const client = new JFrogClient(async () => undefined, fetchFn);
+    const client = new JFrogClient(async () => undefined, opts(fetchFn));
 
     const err = await catchError(client.ping());
     expect(err.kind).toBe('notConfigured');
@@ -104,7 +116,7 @@ describe('JFrogClient', () => {
     [500, 'http'],
   ])('maps HTTP %i to %s', async (status, kind) => {
     const fetchFn = mockFetch(jsonResponse({}, status));
-    const err = await catchError(JFrogClient.forConnection(connection, fetchFn).ping());
+    const err = await catchError(JFrogClient.forConnection(connection, opts(fetchFn)).ping());
     expect(err.kind).toBe(kind);
     expect(err.status).toBe(status);
   });
@@ -113,13 +125,15 @@ describe('JFrogClient', () => {
     const fetchFn = mockFetch(
       jsonResponse({ errors: [{ status: 400, message: 'Failed to parse query' }] }, 400),
     );
-    const err = await catchError(JFrogClient.forConnection(connection, fetchFn).aql('bad'));
+    const err = await catchError(JFrogClient.forConnection(connection, opts(fetchFn)).aql('bad'));
     expect(err.message).toContain('Failed to parse query');
   });
 
   it('reports the underlying cause of network failures', async () => {
     const failure = new TypeError('fetch failed', { cause: new Error('getaddrinfo ENOTFOUND') });
-    const err = await catchError(JFrogClient.forConnection(connection, mockFetch(failure)).ping());
+    const err = await catchError(
+      JFrogClient.forConnection(connection, opts(mockFetch(failure))).ping(),
+    );
     expect(err.kind).toBe('network');
     expect(err.message).toContain('ENOTFOUND');
   });
@@ -132,7 +146,7 @@ describe('JFrogClient', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
-    const response = await JFrogClient.forConnection(connection, fetchFn).send(
+    const response = await JFrogClient.forConnection(connection, opts(fetchFn)).send(
       'GET',
       '/artifactory/api/repositories/missing',
     );
@@ -149,7 +163,7 @@ describe('JFrogClient', () => {
 
   it('send() still throws for network failures', async () => {
     const err = await catchError(
-      JFrogClient.forConnection(connection, mockFetch(new TypeError('fetch failed'))).send(
+      JFrogClient.forConnection(connection, opts(mockFetch(new TypeError('fetch failed')))).send(
         'GET',
         '/x',
       ),
@@ -164,8 +178,97 @@ describe('JFrogClient', () => {
       throw new DOMException('aborted', 'AbortError');
     });
     const err = await catchError(
-      JFrogClient.forConnection(connection, fetchFn).aql('q', controller.signal),
+      JFrogClient.forConnection(connection, opts(fetchFn)).aql('q', controller.signal),
     );
     expect(err.kind).toBe('cancelled');
+  });
+
+  it('retries rate-limited requests, honoring Retry-After', async () => {
+    const responses = [
+      new Response('slow down', { status: 429, headers: { 'Retry-After': '2' } }),
+      new Response('slow down', { status: 429 }),
+      jsonResponse({ version: '7.90.0' }),
+    ];
+    const fetchFn = vi.fn<typeof fetch>(async () => responses.shift()!);
+    const sleep = vi.fn(async () => {});
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+
+    const result = await JFrogClient.forConnection(connection, {
+      fetchFn,
+      sleep,
+      logger,
+    }).version();
+
+    expect(result.version).toBe('7.90.0');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls.map((call) => (call as unknown[])[0])).toEqual([2000, 2000]);
+    expect(logger.warn).toHaveBeenCalledTimes(2);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringMatching(
+        /^GET https:\/\/acme\.jfrog\.io\/artifactory\/api\/system\/version → 200/,
+      ),
+    );
+  });
+
+  it('gives up after two retries and reports the rate limit', async () => {
+    const fetchFn = mockFetch(new Response('', { status: 429 }));
+    const err = await catchError(JFrogClient.forConnection(connection, opts(fetchFn)).ping());
+    expect(err.kind).toBe('rateLimited');
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry a POST that got 503', async () => {
+    const fetchFn = mockFetch(new Response('', { status: 503 }));
+    const response = await JFrogClient.forConnection(connection, opts(fetchFn)).send('POST', '/x');
+    expect(response.status).toBe(503);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('never logs the token', async () => {
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    await JFrogClient.forConnection(connection, {
+      fetchFn: mockFetch(jsonResponse({})),
+      logger,
+    }).send('GET', '/x');
+    await catchError(
+      JFrogClient.forConnection(connection, {
+        fetchFn: mockFetch(new TypeError('fetch failed')),
+        logger,
+      }).send('GET', '/y'),
+    );
+    const logged = [...logger.info.mock.calls, ...logger.error.mock.calls].flat().join('\n');
+    expect(logged).toContain('GET https://acme.jfrog.io/x');
+    expect(logged).not.toContain('secret-token');
+  });
+});
+
+describe('retryDelayMs', () => {
+  const now = Date.parse('2026-10-24T12:00:00Z');
+
+  it('backs off exponentially without Retry-After', () => {
+    expect(retryDelayMs('GET', 429, null, 0, now)).toBe(1000);
+    expect(retryDelayMs('GET', 429, null, 1, now)).toBe(2000);
+  });
+
+  it('stops after two retries', () => {
+    expect(retryDelayMs('GET', 429, null, 2, now)).toBeUndefined();
+  });
+
+  it('honors Retry-After in seconds and as an HTTP date', () => {
+    expect(retryDelayMs('POST', 429, '3', 0, now)).toBe(3000);
+    expect(retryDelayMs('GET', 429, 'Sat, 24 Oct 2026 12:00:05 GMT', 0, now)).toBe(5000);
+    expect(retryDelayMs('GET', 429, 'Sat, 24 Oct 2026 11:59:00 GMT', 0, now)).toBe(0);
+  });
+
+  it('does not wait for long Retry-After values', () => {
+    expect(retryDelayMs('GET', 429, '60', 0, now)).toBeUndefined();
+  });
+
+  it('retries 503 only for GET and HEAD, and nothing else', () => {
+    expect(retryDelayMs('GET', 503, null, 0, now)).toBe(1000);
+    expect(retryDelayMs('HEAD', 503, null, 0, now)).toBe(1000);
+    expect(retryDelayMs('PUT', 503, null, 0, now)).toBeUndefined();
+    expect(retryDelayMs('GET', 500, null, 0, now)).toBeUndefined();
+    expect(retryDelayMs('GET', 404, null, 0, now)).toBeUndefined();
   });
 });

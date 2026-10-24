@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { type Endpoint, isMutating } from '../../shared/endpoints';
 import type { RequestOutcome } from '../../shared/messages';
-import { errorMessage } from '../commands/connection';
+import { errorMessage } from '../errors';
 import { JFrogError, type JFrogClient } from '../services/jfrogClient';
 import { buildRequest } from '../../shared/requestBuilder';
 import type { ResponseDocuments } from './responseDocuments';
@@ -11,7 +11,8 @@ export class RequestExecutor {
   constructor(
     private readonly client: JFrogClient,
     private readonly responses: ResponseDocuments,
-    private readonly getBaseUrl: () => Promise<string | undefined>,
+    /** The active server, named in confirmations so data isn't changed on the wrong one. */
+    private readonly getTarget: () => Promise<{ name?: string; baseUrl: string } | undefined>,
   ) {}
 
   async execute(
@@ -26,10 +27,14 @@ export class RequestExecutor {
     const { method, path } = built.request;
 
     if (isMutating(endpoint)) {
-      const host = (await this.getBaseUrl()) ?? 'the JFrog Platform';
+      const target = await this.getTarget();
+      const server = target?.name ? `"${target.name}"` : 'the JFrog Platform';
       const choice = await vscode.window.showWarningMessage(
-        `Send ${method} ${endpoint.name}?`,
-        { modal: true, detail: `${method} ${host}${path}\n\nThis request may change data.` },
+        `Send ${method} ${endpoint.name} to ${server}?`,
+        {
+          modal: true,
+          detail: `${method} ${target?.baseUrl ?? ''}${path}\n\nThis request may change data on ${server}.`,
+        },
         'Send',
       );
       if (choice !== 'Send') {

@@ -4,8 +4,8 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { parse as parseYaml } from 'yaml';
 import type { Endpoint, EndpointGroup } from '../../shared/endpoints';
-import { errorMessage } from '../commands/connection';
-import { CONFIG_SECTION } from '../services/authService';
+import { errorMessage } from '../errors';
+import { CONFIG_SECTION } from '../services/serverManager';
 import { BUILTIN_CATALOG } from './builtinCatalog';
 import { parseOpenApi } from './openApi';
 

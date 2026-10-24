@@ -1,15 +1,15 @@
 import * as vscode from 'vscode';
 import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messages';
-import { errorMessage } from '../commands/connection';
+import { errorMessage } from '../errors';
 import { promptForQueryName, type QueryToLoad, toRef } from '../commands/savedQueries';
-import type { AuthService } from '../services/authService';
+import type { ServerManager } from '../services/serverManager';
 import { JFrogError, type JFrogClient } from '../services/jfrogClient';
 import type { SavedQuery, SavedQueryStore } from '../services/savedQueryStore';
 import { renderWebviewHtml } from './webviewHtml';
 
 export interface AqlPanelServices {
   client: JFrogClient;
-  auth: AuthService;
+  servers: ServerManager;
   store: SavedQueryStore;
 }
 
@@ -23,7 +23,7 @@ export class AqlPanel implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly inFlight = new Map<number, AbortController>();
   private readonly client: JFrogClient;
-  private readonly auth: AuthService;
+  private readonly servers: ServerManager;
   private readonly store: SavedQueryStore;
 
   private ready = false;
@@ -65,11 +65,11 @@ export class AqlPanel implements vscode.Disposable {
     extensionUri: vscode.Uri,
     services: AqlPanelServices,
   ) {
-    ({ client: this.client, auth: this.auth, store: this.store } = services);
+    ({ client: this.client, servers: this.servers, store: this.store } = services);
     panel.webview.html = renderWebviewHtml(panel.webview, extensionUri, 'aql', DEFAULT_TITLE);
     this.disposables.push(
       panel.webview.onDidReceiveMessage((msg: WebviewToExtension) => void this.handleMessage(msg)),
-      this.auth.onDidChange(() => void this.postConnection()),
+      this.servers.onDidChange(() => void this.postConnection()),
       this.store.onDidChange(() => {
         this.postSavedQueries();
         this.updateTitle();
@@ -122,6 +122,9 @@ export class AqlPanel implements vscode.Disposable {
         break;
       case 'configure':
         await vscode.commands.executeCommand('jfrogRequestCenter.configure');
+        break;
+      case 'switchServer':
+        await vscode.commands.executeCommand('jfrogRequestCenter.switchServer');
         break;
       case 'executeAql':
         await this.executeAql(msg.requestId, msg.query);
@@ -214,8 +217,12 @@ export class AqlPanel implements vscode.Disposable {
   }
 
   private async postConnection(): Promise<void> {
-    const connection = await this.auth.getConnection();
-    this.post({ type: 'connection', baseUrl: connection?.baseUrl });
+    const connection = await this.servers.getConnection();
+    this.post({
+      type: 'connection',
+      baseUrl: connection?.baseUrl,
+      serverName: connection?.name,
+    });
   }
 
   private post(msg: ExtensionToWebview): void {

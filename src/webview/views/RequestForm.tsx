@@ -3,6 +3,7 @@ import { type Endpoint, type EndpointParam, isMutating } from '../../shared/endp
 import type { RequestOutcome } from '../../shared/messages';
 import { buildRequest } from '../../shared/requestBuilder';
 import { CodeEditor } from '../components/CodeEditor';
+import { ServerBadge } from '../components/ServerBadge';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from '../utils/vscode';
 
 interface FormState {
@@ -26,12 +27,14 @@ export function RequestForm() {
   const [sending, setSending] = useState(false);
   // undefined = not configured, null = not known yet.
   const [baseUrl, setBaseUrl] = useState<string | undefined | null>(null);
+  const [serverName, setServerName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const unsubscribe = onMessage((msg) => {
       switch (msg.type) {
         case 'connection':
           setBaseUrl(msg.baseUrl);
+          setServerName(msg.serverName);
           break;
         case 'showEndpoint':
           setEndpoint(msg.endpoint);
@@ -113,14 +116,14 @@ export function RequestForm() {
         </button>
         <OutcomeMessage outcome={outcome} />
         <span className="spacer" />
-        {baseUrl && <span className="muted">{baseUrl}</span>}
+        {baseUrl && <ServerBadge name={serverName} url={baseUrl} />}
       </div>
 
       {baseUrl === undefined && (
         <div className="banner">
-          No JFrog connection is configured.{' '}
+          No JFrog server is set up, or it has no access token.{' '}
           <button className="link" onClick={() => postMessage({ type: 'configure' })}>
-            Configure connection
+            Set up a server
           </button>
         </div>
       )}

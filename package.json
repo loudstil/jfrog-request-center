@@ -2,7 +2,7 @@
   "name": "jfrog-request-center",
   "displayName": "JFrog Request Center",
   "description": "Write and run AQL queries and explore JFrog REST APIs without leaving VS Code.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "local-dev",
   "private": true,
   "engines": {
@@ -11,6 +11,13 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "jfrog",
+    "artifactory",
+    "aql",
+    "rest api",
+    "openapi"
+  ],
   "main": "./dist/extension.js",
   "activationEvents": [
     "onStartupFinished"
@@ -18,13 +25,37 @@
   "contributes": {
     "commands": [
       {
+        "command": "jfrogRequestCenter.switchServer",
+        "title": "Switch Server…",
+        "category": "JFrog Request Center",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "jfrogRequestCenter.addServer",
+        "title": "Add Server…",
+        "category": "JFrog Request Center",
+        "icon": "$(add)"
+      },
+      {
+        "command": "jfrogRequestCenter.editServer",
+        "title": "Edit Server…",
+        "category": "JFrog Request Center",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jfrogRequestCenter.removeServer",
+        "title": "Remove Server…",
+        "category": "JFrog Request Center",
+        "icon": "$(trash)"
+      },
+      {
         "command": "jfrogRequestCenter.configure",
-        "title": "Configure Connection",
+        "title": "Configure Active Server",
         "category": "JFrog Request Center"
       },
       {
         "command": "jfrogRequestCenter.clearCredentials",
-        "title": "Clear Credentials",
+        "title": "Clear Access Token",
         "category": "JFrog Request Center"
       },
       {
@@ -40,30 +71,30 @@
       },
       {
         "command": "jfrogRequestCenter.openSavedQuery",
-        "title": "Open Saved Query\u2026",
+        "title": "Open Saved Query…",
         "category": "JFrog Request Center"
       },
       {
         "command": "jfrogRequestCenter.renameSavedQuery",
-        "title": "Rename Saved Query\u2026",
+        "title": "Rename Saved Query…",
         "category": "JFrog Request Center",
         "icon": "$(edit)"
       },
       {
         "command": "jfrogRequestCenter.deleteSavedQuery",
-        "title": "Delete Saved Query\u2026",
+        "title": "Delete Saved Query…",
         "category": "JFrog Request Center",
         "icon": "$(trash)"
       },
       {
         "command": "jfrogRequestCenter.executeRequest",
-        "title": "Send API Request\u2026",
+        "title": "Send API Request…",
         "category": "JFrog Request Center",
         "icon": "$(play)"
       },
       {
         "command": "jfrogRequestCenter.openRequestForm",
-        "title": "Open Request Form\u2026",
+        "title": "Open Request Form…",
         "category": "JFrog Request Center",
         "icon": "$(edit)"
       },
@@ -77,20 +108,55 @@
         "title": "Reload OpenAPI Specs",
         "category": "JFrog Request Center",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "jfrogRequestCenter.showLogs",
+        "title": "Show Logs",
+        "category": "JFrog Request Center"
       }
     ],
     "configuration": {
       "title": "JFrog Request Center",
       "properties": {
+        "jfrogRequestCenter.servers": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "The JFrog Platform servers you can switch between. Access tokens are not stored here; they are kept in your OS keychain. Usually edited with **JFrog Request Center: Add Server**; can also be shared with a team in a workspace's `.vscode/settings.json`.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "url"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Display name, e.g. \"Production\"."
+              },
+              "url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Platform URL, e.g. https://mycompany.jfrog.io"
+              },
+              "username": {
+                "type": "string",
+                "description": "Optional. When set, the token is sent with Basic auth."
+              }
+            }
+          }
+        },
         "jfrogRequestCenter.platformUrl": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Base URL of your JFrog Platform, e.g. `https://mycompany.jfrog.io`."
+          "markdownDescription": "Base URL of your JFrog Platform, e.g. `https://mycompany.jfrog.io`.",
+          "markdownDeprecationMessage": "Replaced by `jfrogRequestCenter.servers`. Migrated automatically."
         },
         "jfrogRequestCenter.username": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Optional username. When set, requests use Basic auth (`username:token`); otherwise the access token is sent as a Bearer token."
+          "markdownDescription": "Optional username. When set, requests use Basic auth (`username:token`); otherwise the access token is sent as a Bearer token.",
+          "markdownDeprecationMessage": "Replaced by `jfrogRequestCenter.servers`. Migrated automatically."
         },
         "jfrogRequestCenter.openApiSpecs": {
           "type": "array",
@@ -114,6 +180,10 @@
     "views": {
       "jfrogRequestCenter": [
         {
+          "id": "jfrogRequestCenter.servers",
+          "name": "Servers"
+        },
+        {
           "id": "jfrogRequestCenter.apiExplorer",
           "name": "API Explorer"
         },
@@ -127,10 +197,19 @@
       {
         "view": "jfrogRequestCenter.savedQueries",
         "contents": "No saved queries yet. Write a query in the AQL Manager and click Save.\n[Open AQL Manager](command:jfrogRequestCenter.openAqlManager)"
+      },
+      {
+        "view": "jfrogRequestCenter.servers",
+        "contents": "Add the JFrog Platform servers you work with. You can switch between them at any time.\n[Add Server](command:jfrogRequestCenter.addServer)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "jfrogRequestCenter.addServer",
+          "when": "view == jfrogRequestCenter.servers",
+          "group": "navigation"
+        },
         {
           "command": "jfrogRequestCenter.newQuery",
           "when": "view == jfrogRequestCenter.savedQueries",
@@ -177,6 +256,31 @@
           "command": "jfrogRequestCenter.copyEndpointPath",
           "when": "view == jfrogRequestCenter.apiExplorer && viewItem == endpoint",
           "group": "2_copy@1"
+        },
+        {
+          "command": "jfrogRequestCenter.editServer",
+          "when": "view == jfrogRequestCenter.servers && viewItem =~ /^server/",
+          "group": "inline"
+        },
+        {
+          "command": "jfrogRequestCenter.switchServer",
+          "when": "view == jfrogRequestCenter.servers && viewItem == server",
+          "group": "1_server@1"
+        },
+        {
+          "command": "jfrogRequestCenter.editServer",
+          "when": "view == jfrogRequestCenter.servers && viewItem =~ /^server/",
+          "group": "1_server@2"
+        },
+        {
+          "command": "jfrogRequestCenter.clearCredentials",
+          "when": "view == jfrogRequestCenter.servers && viewItem =~ /^server/",
+          "group": "2_token@1"
+        },
+        {
+          "command": "jfrogRequestCenter.removeServer",
+          "when": "view == jfrogRequestCenter.servers && viewItem =~ /^server/",
+          "group": "3_remove@1"
         }
       ]
     }

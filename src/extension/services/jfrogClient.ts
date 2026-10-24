@@ -3,6 +3,8 @@
 import type { AqlResponse } from '../../shared/aql';
 
 export interface Connection {
+  /** The server profile's display name, if the connection came from one. */
+  name?: string;
   baseUrl: string;
   username?: string;
   token: string;
@@ -57,8 +59,26 @@ export interface VersionInfo {
   revision: string;
 }
 
+/** Where the client reports each request. Matches vscode.LogOutputChannel; never sees secrets. */
+export interface RequestLogger {
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+}
+
+export interface ClientOptions {
+  fetchFn?: typeof fetch;
+  logger?: RequestLogger;
+  /** Waits between retries; injectable for tests. */
+  sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
+}
+
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_ERROR_DETAIL_LENGTH = 300;
+const MAX_RETRIES = 2;
+// Waiting longer than this is worse than telling the user; the server asked for a long pause.
+const MAX_RETRY_DELAY_MS = 10_000;
+const BASE_RETRY_DELAY_MS = 1_000;
 
 /** Strips trailing slashes and a trailing `/artifactory`, so paths can always start with `/artifactory/...`. */
 export function normalizeBaseUrl(url: string): string {
@@ -68,15 +88,52 @@ export function normalizeBaseUrl(url: string): string {
     .replace(/\/artifactory$/i, '');
 }
 
+/**
+ * How long to wait before retrying a response, or undefined if it shouldn't be retried.
+ * 429 (rate limited) is retried for any method, since the server didn't process the request;
+ * 503 only for GET/HEAD. `Retry-After` (seconds or an HTTP date) is honored when present.
+ */
+export function retryDelayMs(
+  method: string,
+  status: number,
+  retryAfter: string | null,
+  attempt: number,
+  now = Date.now(),
+): number | undefined {
+  const retryable = status === 429 || (status === 503 && (method === 'GET' || method === 'HEAD'));
+  if (!retryable || attempt >= MAX_RETRIES) {
+    return undefined;
+  }
+  let delay = BASE_RETRY_DELAY_MS * 2 ** attempt;
+  if (retryAfter?.trim()) {
+    const seconds = Number(retryAfter);
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(seconds)) {
+      delay = seconds * 1000;
+    } else if (!Number.isNaN(date)) {
+      delay = date - now;
+    }
+  }
+  return delay > MAX_RETRY_DELAY_MS ? undefined : Math.max(0, delay);
+}
+
 export class JFrogClient {
+  private readonly fetchFn: typeof fetch;
+  private readonly logger: RequestLogger | undefined;
+  private readonly sleep: (ms: number, signal: AbortSignal) => Promise<void>;
+
   constructor(
     private readonly getConnection: ConnectionProvider,
-    private readonly fetchFn: typeof fetch = globalThis.fetch,
-  ) {}
+    options: ClientOptions = {},
+  ) {
+    this.fetchFn = options.fetchFn ?? globalThis.fetch;
+    this.logger = options.logger;
+    this.sleep = options.sleep ?? abortableSleep;
+  }
 
   /** A client bound to a fixed connection, e.g. to verify credentials before saving them. */
-  static forConnection(connection: Connection, fetchFn?: typeof fetch): JFrogClient {
-    return new JFrogClient(async () => connection, fetchFn);
+  static forConnection(connection: Connection, options?: ClientOptions): JFrogClient {
+    return new JFrogClient(async () => connection, options);
   }
 
   /** Sends a request and parses the response; non-2xx statuses throw a JFrogError. */
@@ -124,18 +181,47 @@ export class JFrogClient {
 
     const started = Date.now();
     try {
-      const response = await this.fetchFn(url, { method, headers, body, signal });
-      return {
-        url: url.toString(),
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        contentType: response.headers.get('content-type') ?? '',
-        body: await response.text(),
-        elapsedMs: Date.now() - started,
-      };
+      for (let attempt = 0; ; attempt++) {
+        const attemptStarted = Date.now();
+        const response = await this.fetchFn(url, { method, headers, body, signal });
+        const elapsed = Date.now() - attemptStarted;
+        const delay = retryDelayMs(
+          method,
+          response.status,
+          response.headers.get('retry-after'),
+          attempt,
+        );
+        if (delay !== undefined) {
+          this.logger?.warn(
+            `${method} ${url} → ${response.status} (${elapsed} ms), retrying in ${delay} ms`,
+          );
+          // Discard the body without waiting; we only care about the next attempt.
+          void response.body?.cancel().catch(() => undefined);
+          await this.sleep(delay, signal);
+          continue;
+        }
+        const raw: RawResponse = {
+          url: url.toString(),
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          contentType: response.headers.get('content-type') ?? '',
+          body: await response.text(),
+          elapsedMs: Date.now() - started,
+        };
+        const status = `${raw.status} ${raw.statusText}`.trim();
+        const line = `${method} ${url} → ${status} (${elapsed} ms)`;
+        if (raw.ok) {
+          this.logger?.info(line);
+        } else {
+          this.logger?.warn(line);
+        }
+        return raw;
+      }
     } catch (err) {
-      throw toRequestError(err, url, options.signal);
+      const error = toRequestError(err, url, options.signal);
+      this.logger?.error(`${method} ${url} failed: ${error.message}`);
+      throw error;
     }
   }
 
@@ -154,6 +240,24 @@ export class JFrogClient {
       signal,
     });
   }
+}
+
+function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function authorizationHeader({ username, token }: Connection): string {
