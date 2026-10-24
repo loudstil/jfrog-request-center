@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
 import type { SavedQueryRef } from '../../shared/messages';
 import { AqlEditor } from '../components/AqlEditor';
 import { ResultsGrid } from '../components/ResultsGrid';
+import {
+  filterRows,
+  getColumns,
+  nextSort,
+  type Row,
+  type SortState,
+  sortRows,
+} from '../components/resultsModel';
 import { SplitPane } from '../components/SplitPane';
 import { getPersistedState, onMessage, postMessage, setPersistedState } from '../utils/vscode';
 
@@ -199,25 +207,60 @@ export function AqlBuilder() {
   );
 }
 
+const NO_ROWS: readonly Row[] = [];
+
 function ResultsPane({ run }: { run: RunState }) {
-  const rows = run.kind === 'done' ? run.rows : [];
+  const rows = run.kind === 'done' ? run.rows : NO_ROWS;
+  // Sort and filter carry over between runs, so re-running a query keeps the same view.
+  const [sort, setSort] = useState<SortState | undefined>(undefined);
+  const [filter, setFilter] = useState('');
+  // Filtering large results can take a moment; keep typing responsive.
+  const deferredFilter = useDeferredValue(filter);
+
+  const columns = useMemo(() => getColumns(rows), [rows]);
+  const filtered = useMemo(
+    () => filterRows(rows, columns, deferredFilter),
+    [rows, columns, deferredFilter],
+  );
+  const activeSort = sort && columns.includes(sort.column) ? sort : undefined;
+  const visible = useMemo(() => sortRows(filtered, activeSort), [filtered, activeSort]);
+  const isFiltered = visible.length !== rows.length;
+  const shown = isFiltered ? `the ${visible.length} rows shown` : `all ${rows.length} rows`;
 
   return (
     <section className="results">
       <header className="results-header">
         <span className="results-title">{resultsTitle(run)}</span>
+        {isFiltered && (
+          <span className="muted">
+            · {visible.length} of {rows.length} shown
+          </span>
+        )}
         <span className="spacer" />
+        {rows.length > 0 && (
+          <input
+            className="filter-input"
+            type="search"
+            placeholder="Filter rows"
+            aria-label="Filter rows"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && setFilter('')}
+          />
+        )}
         <button
           className="icon-button"
-          disabled={!rows.length}
-          onClick={() => postMessage({ type: 'copyToClipboard', text: toJson(rows) })}
+          disabled={!visible.length}
+          title={`Copy ${shown} as JSON`}
+          onClick={() => postMessage({ type: 'copyToClipboard', text: toJson(visible) })}
         >
           Copy JSON
         </button>
         <button
           className="icon-button"
-          disabled={!rows.length}
-          onClick={() => postMessage({ type: 'openJson', content: toJson(rows) })}
+          disabled={!visible.length}
+          title={`Open ${shown} in a JSON editor tab`}
+          onClick={() => postMessage({ type: 'openJson', content: toJson(visible) })}
         >
           Open as JSON
         </button>
@@ -238,12 +281,21 @@ function ResultsPane({ run }: { run: RunState }) {
             )}
           </div>
         )}
-        {run.kind === 'done' &&
-          (rows.length ? (
-            <ResultsGrid rows={rows} />
-          ) : (
-            <p className="placeholder">The query returned no results.</p>
-          ))}
+        {run.kind === 'done' && !rows.length && (
+          <p className="placeholder">The query returned no results.</p>
+        )}
+        {run.kind === 'done' && rows.length > 0 && !visible.length && (
+          <p className="placeholder">No rows match “{deferredFilter.trim()}”.</p>
+        )}
+        {visible.length > 0 && (
+          <ResultsGrid
+            rows={visible}
+            allRows={rows}
+            columns={columns}
+            sort={activeSort}
+            onSortClick={(column) => setSort(nextSort(activeSort, column))}
+          />
+        )}
       </div>
     </section>
   );
@@ -265,6 +317,6 @@ function resultsTitle(run: RunState): string {
   }
 }
 
-function toJson(rows: Record<string, unknown>[]): string {
+function toJson(rows: readonly Row[]): string {
   return JSON.stringify(rows, null, 2);
 }

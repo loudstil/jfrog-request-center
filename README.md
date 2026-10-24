@@ -10,8 +10,10 @@ A VS Code extension for writing and running AQL (Artifactory Query Language) que
   stored in VS Code's SecretStorage (your OS keychain), never in settings.
 - **JFrog Request Center: Open AQL Manager**: write a query in a Monaco editor with AQL
   syntax highlighting and autocomplete (domains, methods, fields for the queried domain, and `$`
-  operators), run it with **Execute AQL** or Ctrl/Cmd+Enter, and see the results in a table. You
-  can copy them or open them as JSON. The editor follows your VS Code theme and editor font.
+  operators), run it with **Execute AQL** or Ctrl/Cmd+Enter, and see the results in a table that
+  handles large results smoothly: click a header to sort, type in the filter box to search all
+  columns, and drag a header edge to resize a column. Copy or open the shown rows as JSON. Drag
+  the divider to resize the editor and results. The editor follows your VS Code theme and font.
 - **Saved queries**: **Save** (Ctrl/Cmd+S) and **Save As…** in the AQL Manager. Saved queries are
   listed in the JFrog Request Center sidebar (activity bar icon). Click one to open it, or use the
   context menu to rename or delete it. They're stored in VS Code's global state and sync with

@@ -193,6 +193,7 @@ body {
 
 .results-body {
   flex: 1;
+  min-height: 0; /* lets the grid, not the pane, own the scrollbars */
   overflow: auto;
 }
 
@@ -212,28 +213,147 @@ body {
 }
 
 .grid {
-  width: 100%;
-  border-collapse: collapse;
+  position: relative;
+  height: 100%;
+  overflow: auto;
   font-family: var(--vscode-editor-font-family);
   font-size: 12px;
-  white-space: nowrap;
 }
 
-.grid th {
+.grid-header {
   position: sticky;
   top: 0;
-  padding: 4px 10px;
+  z-index: 2;
+  display: flex;
+  height: 26px;
   border-bottom: 1px solid var(--vscode-panel-border);
   background: var(--vscode-editorGroupHeader-tabsBackground);
   font-weight: 600;
-  text-align: left;
 }
 
-.grid td {
-  padding: 3px 10px;
-  border-bottom: 1px solid var(--vscode-editorGroup-border, transparent);
+.grid-body {
+  position: relative;
 }
 
-.grid tbody tr:hover {
+.grid-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+}
+
+.grid-row.odd {
+  background: var(--vscode-tree-tableOddRowsBackground, transparent);
+}
+
+.grid-row:hover {
   background: var(--vscode-list-hoverBackground);
+}
+
+.grid-cell {
+  flex: none;
+  box-sizing: border-box;
+  padding: 0 10px;
+  overflow: hidden;
+  line-height: 24px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.grid-row-number {
+  color: var(--vscode-editorLineNumber-foreground);
+  text-align: right;
+  user-select: none;
+}
+
+.grid-header-cell {
+  position: relative;
+  display: flex;
+  padding: 0;
+  line-height: 26px;
+}
+
+.grid-sort-button {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0 10px;
+  border: none;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.grid-sort-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.grid-sort-button:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.grid-header-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grid-sort-indicator {
+  flex: none;
+  font-size: 9px;
+}
+
+.grid-column-resizer {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  z-index: 1;
+  width: 6px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.grid-column-resizer::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 2px;
+  width: 1px;
+  background: var(--vscode-panel-border);
+}
+
+.grid-column-resizer:hover::after {
+  top: 0;
+  bottom: 0;
+  left: 1px;
+  width: 3px;
+  background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
+}
+
+.filter-input {
+  width: 180px;
+  margin-right: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  font: inherit;
+  font-size: 12px;
+}
+
+.filter-input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.filter-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
