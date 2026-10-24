@@ -1,0 +1,78 @@
+{
+  "name": "jfrog-request-center",
+  "displayName": "JFrog Request Center",
+  "description": "Write and run AQL queries and explore JFrog REST APIs without leaving VS Code.",
+  "version": "0.0.1",
+  "publisher": "local-dev",
+  "private": true,
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "jfrogRequestCenter.configure",
+        "title": "Configure Connection",
+        "category": "JFrog Request Center"
+      },
+      {
+        "command": "jfrogRequestCenter.clearCredentials",
+        "title": "Clear Credentials",
+        "category": "JFrog Request Center"
+      },
+      {
+        "command": "jfrogRequestCenter.openAqlManager",
+        "title": "Open AQL Manager",
+        "category": "JFrog Request Center"
+      }
+    ],
+    "configuration": {
+      "title": "JFrog Request Center",
+      "properties": {
+        "jfrogRequestCenter.platformUrl": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Base URL of your JFrog Platform, e.g. `https://mycompany.jfrog.io`."
+        },
+        "jfrogRequestCenter.username": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Optional username. When set, requests use Basic auth (`username:token`); otherwise the access token is sent as a Bearer token."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.webview.json",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "vscode:prepublish": "npm run typecheck && node esbuild.mjs --production",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/vscode": "~1.95.0",
+    "@vscode/vsce": "^4.0.0",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^3.2.7"
+  }
+}

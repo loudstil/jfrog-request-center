@@ -1,0 +1,13 @@
+.vscode/**
+src/**
+node_modules/**
+**/*.map
+**/*.test.ts
+tsconfig*.json
+esbuild.mjs
+eslint.config.mjs
+.prettier*
+*.pdf
+vs_code_extension_prototype.html
+folder_structure.md
+.gitignore
