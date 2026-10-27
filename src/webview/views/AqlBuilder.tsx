@@ -1,7 +1,9 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { AqlRange } from '../../shared/aql';
 import type { SavedQueryRef } from '../../shared/messages';
-import { CodeEditor } from '../components/CodeEditor';
+import { formatAql } from '../aql/aqlFormatter';
+import { type AqlDiagnostic, lineColumnAt, parseAql } from '../aql/aqlValidator';
+import { CodeEditor, type CodeEditorApi } from '../components/CodeEditor';
 import { ServerBadge } from '../components/ServerBadge';
 import { ResultsGrid } from '../components/ResultsGrid';
 import {
@@ -35,6 +37,8 @@ interface AqlPersistedState {
 type RunState =
   | { kind: 'idle' }
   | { kind: 'running'; requestId: number }
+  /** Execute was blocked by syntax errors (shown live from the current text). */
+  | { kind: 'invalid' }
   | { kind: 'error'; message: string; errorKind: string }
   | { kind: 'done'; rows: Record<string, unknown>[]; range?: AqlRange; elapsedMs: number };
 
@@ -117,9 +121,23 @@ export function AqlBuilder() {
   );
 
   const running = run.kind === 'running';
+  // Rechecked on every edit; the editor shows the same problems as squiggles.
+  const parsed = useMemo(() => parseAql(query), [query]);
+  const diagnostics = parsed.diagnostics;
+  // Formatting needs a query that parses; other problems don't get in the way.
+  const canFormat = parsed.query !== undefined;
+  const errors = useMemo(() => diagnostics.filter((d) => d.severity === 'error'), [diagnostics]);
+  const editorApi = useRef<CodeEditorApi | undefined>(undefined);
+  const showProblem = (problem: AqlDiagnostic) =>
+    editorApi.current?.selectRange(problem.start, problem.end);
 
-  function execute() {
+  /** Runs the query. Syntax errors block it unless `anyway` (the check could be wrong). */
+  function execute(anyway = false) {
     if (running || !query.trim() || !baseUrl) {
+      return;
+    }
+    if (!anyway && errors.length) {
+      setRun({ kind: 'invalid' });
       return;
     }
     const requestId = nextRequestId.current++;
@@ -159,13 +177,35 @@ export function AqlBuilder() {
         ) : (
           <button
             className="button"
-            onClick={execute}
+            onClick={() => execute()}
             disabled={!query.trim() || !baseUrl}
             title="Execute (Ctrl/Cmd+Enter)"
           >
             ▶ Execute AQL
           </button>
         )}
+        {diagnostics.length > 0 && (
+          <button
+            className={`problems-badge ${errors.length ? 'has-errors' : 'has-warnings'}`}
+            onClick={() => showProblem(errors[0] ?? diagnostics[0])}
+            title={diagnostics.map((d) => d.message).join('\n')}
+          >
+            {errors.length ? '✕' : '⚠'} {diagnostics.length}{' '}
+            {diagnostics.length === 1 ? 'problem' : 'problems'}
+          </button>
+        )}
+        <button
+          className="button secondary"
+          onClick={() => editorApi.current?.format()}
+          disabled={!canFormat}
+          title={
+            canFormat
+              ? 'Format the query (Shift+Alt+F)'
+              : 'Fix the syntax error to format the query'
+          }
+        >
+          Format
+        </button>
         <button
           className="button secondary"
           onClick={() => save()}
@@ -213,12 +253,22 @@ export function AqlBuilder() {
             onChange={setQuery}
             language="aql"
             ariaLabel="AQL query"
-            onExecute={execute}
+            onExecute={() => execute()}
             onSave={save}
+            formatter={formatAql}
             autoFocus
+            apiRef={editorApi}
           />
         }
-        bottom={<ResultsPane run={run} />}
+        bottom={
+          <ResultsPane
+            run={run}
+            query={query}
+            problems={errors}
+            onRunAnyway={() => execute(true)}
+            onShowProblem={showProblem}
+          />
+        }
         ratio={editorRatio}
         onRatioChange={setEditorRatio}
         defaultRatio={DEFAULT_EDITOR_RATIO}
@@ -232,7 +282,19 @@ export function AqlBuilder() {
 
 const NO_ROWS: readonly Row[] = [];
 
-function ResultsPane({ run }: { run: RunState }) {
+function ResultsPane({
+  run,
+  query,
+  problems,
+  onRunAnyway,
+  onShowProblem,
+}: {
+  run: RunState;
+  query: string;
+  problems: AqlDiagnostic[];
+  onRunAnyway: () => void;
+  onShowProblem: (problem: AqlDiagnostic) => void;
+}) {
   const rows = run.kind === 'done' ? run.rows : NO_ROWS;
   // Sort and filter carry over between runs, so re-running a query keeps the same view.
   const [sort, setSort] = useState<SortState | undefined>(undefined);
@@ -291,6 +353,37 @@ function ResultsPane({ run }: { run: RunState }) {
       <div className="results-body">
         {run.kind === 'idle' && <p className="placeholder">Run a query to view results here.</p>}
         {run.kind === 'running' && <p className="placeholder">Executing AQL query…</p>}
+        {run.kind === 'invalid' &&
+          (problems.length ? (
+            <div className="problems" role="alert">
+              <p>
+                The query has{' '}
+                {problems.length === 1 ? 'a syntax error' : `${problems.length} syntax errors`}. Fix{' '}
+                {problems.length === 1 ? 'it' : 'them'}, or{' '}
+                <button className="link" onClick={onRunAnyway}>
+                  run it anyway
+                </button>{' '}
+                if you think the check is wrong.
+              </p>
+              <ul>
+                {problems.map((problem) => {
+                  const { line, column } = lineColumnAt(query, problem.start);
+                  return (
+                    <li key={`${problem.start}:${problem.message}`}>
+                      <button className="problem" onClick={() => onShowProblem(problem)}>
+                        <span className="problem-location">
+                          Line {line}, column {column}
+                        </span>
+                        {problem.message}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : (
+            <p className="placeholder">No syntax errors left. Press Execute to run the query.</p>
+          ))}
         {run.kind === 'error' && (
           <div className="error" role="alert">
             {run.message}
@@ -330,6 +423,8 @@ function resultsTitle(run: RunState): string {
       return 'Results (running…)';
     case 'error':
       return 'Results (error)';
+    case 'invalid':
+      return 'Results (not run)';
     case 'done': {
       const total = run.range?.total ?? run.rows.length;
       const count = total === run.rows.length ? `${total}` : `${run.rows.length} of ${total}`;

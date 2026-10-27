@@ -6,6 +6,7 @@ import {
   type AqlSuggestionKind,
   getAqlCompletions,
 } from './aqlCompletions';
+import { validateAql } from './aqlValidator';
 
 export const AQL_LANGUAGE_ID = 'aql';
 
@@ -113,5 +114,66 @@ export function registerAqlLanguage(monaco: typeof Monaco): void {
         })),
       };
     },
+  });
+}
+
+const MARKER_OWNER = 'aql-syntax';
+const VALIDATION_DELAY_MS = 250;
+
+/** Keeps syntax-check markers (squiggles with hover messages) on every AQL model up to date. */
+export function enableAqlValidation(monaco: typeof Monaco): void {
+  const watch = (model: Monaco.editor.ITextModel) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const validate = () => {
+      if (model.isDisposed() || model.getLanguageId() !== AQL_LANGUAGE_ID) {
+        return;
+      }
+      monaco.editor.setModelMarkers(model, MARKER_OWNER, toMarkers(monaco, model));
+    };
+    validate();
+    const changes = model.onDidChangeContent(() => {
+      clearTimeout(timer);
+      timer = setTimeout(validate, VALIDATION_DELAY_MS);
+    });
+    model.onWillDispose(() => {
+      clearTimeout(timer);
+      changes.dispose();
+    });
+  };
+
+  monaco.editor.onDidCreateModel((model) => {
+    if (model.getLanguageId() === AQL_LANGUAGE_ID) {
+      watch(model);
+    }
+  });
+  monaco.editor.onDidChangeModelLanguage(({ model, oldLanguage }) => {
+    if (model.getLanguageId() === AQL_LANGUAGE_ID) {
+      watch(model);
+    } else if (oldLanguage === AQL_LANGUAGE_ID) {
+      monaco.editor.setModelMarkers(model, MARKER_OWNER, []);
+    }
+  });
+}
+
+function toMarkers(
+  monaco: typeof Monaco,
+  model: Monaco.editor.ITextModel,
+): Monaco.editor.IMarkerData[] {
+  return validateAql(model.getValue()).map((d) => {
+    // Problems at the very end ("missing }") have no width; mark the last character instead.
+    const start = d.end > d.start ? d.start : Math.max(0, d.start - 1);
+    const end = Math.max(d.end, start + 1);
+    const from = model.getPositionAt(start);
+    const to = model.getPositionAt(end);
+    return {
+      severity:
+        d.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+      message: d.message,
+      source: 'AQL',
+      startLineNumber: from.lineNumber,
+      startColumn: from.column,
+      endLineNumber: to.lineNumber,
+      endColumn: to.column,
+    };
   });
 }

@@ -46,6 +46,15 @@ Run **JFrog Request Center: Open AQL Manager**, or click the status bar item.
 - **Editor**: AQL highlighting, bracket matching, and autocomplete for domains (`items`,
   `builds`, ...), methods (`find`, `include`, `sort`, `limit`, ...), the fields of the domain
   you're querying, and `$` operators (`$match`, `$last`, ...).
+- **Syntax check**: mistakes are underlined as you type (hover for the explanation), and the
+  toolbar shows how many there are; click it to jump to the first one. Execute won't send a
+  query with syntax errors: it lists them instead, and **run it anyway** sends it regardless in
+  case the check is wrong. Warnings don't stop a query: an unknown domain, or a field name the
+  domain doesn't have (with a "did you mean" suggestion, e.g. `nmae` → `name`). Field paths
+  through related entities, such as `artifact.module.build.name`, are checked too; properties
+  (`@...`) aren't.
+- **Format**: **Format** or Shift+Alt+F lays the query out with one condition per line and
+  breaks up anything too long for one line. Undo with Ctrl/Cmd+Z.
 - **Run**: **Execute AQL** or Ctrl/Cmd+Enter. A running query can be cancelled.
 - **Results**: click a column header to sort, type in the filter box to search all columns, and
   drag a header edge to resize a column (double-click to reset). **Copy JSON** and **Open as

@@ -1,5 +1,13 @@
-import { useEffect, useRef } from 'react';
+import { type MutableRefObject, useEffect, useRef } from 'react';
 import { monaco, THEME_NAME } from '../monaco/setup';
+
+/** Lets a parent drive the editor, e.g. move the cursor to a syntax problem. */
+export interface CodeEditorApi {
+  /** Selects text by offsets, scrolls it into view and focuses the editor. */
+  selectRange(start: number, end: number): void;
+  /** Formats the text with the `formatter` prop, as one edit that can be undone. */
+  format(): void;
+}
 
 interface CodeEditorProps {
   value: string;
@@ -11,7 +19,10 @@ interface CodeEditorProps {
   onExecute?: () => void;
   /** Called on Ctrl/Cmd+S. */
   onSave?: () => void;
+  /** Returns the text formatted, or undefined if it can't be. Enables Shift+Alt+F. */
+  formatter?: (text: string) => string | undefined;
   autoFocus?: boolean;
+  apiRef?: MutableRefObject<CodeEditorApi | undefined>;
 }
 
 /** A Monaco editor that follows the VS Code theme and editor font. */
@@ -22,7 +33,9 @@ export function CodeEditor({
   ariaLabel,
   onExecute,
   onSave,
+  formatter,
   autoFocus = false,
+  apiRef,
 }: CodeEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined);
@@ -30,10 +43,12 @@ export function CodeEditor({
   const onChangeRef = useRef(onChange);
   const onExecuteRef = useRef(onExecute);
   const onSaveRef = useRef(onSave);
+  const formatterRef = useRef(formatter);
   useEffect(() => {
     onChangeRef.current = onChange;
     onExecuteRef.current = onExecute;
     onSaveRef.current = onSave;
+    formatterRef.current = formatter;
   });
 
   useEffect(() => {
@@ -56,10 +71,47 @@ export function CodeEditor({
     });
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => onExecuteRef.current?.());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => onSaveRef.current?.());
+    // Applied directly rather than through Monaco's Format Document, which waits on the worker.
+    const format = () => {
+      const model = editor.getModel();
+      const text = editor.getValue();
+      const formatted = formatterRef.current?.(text);
+      if (model && formatted !== undefined && formatted !== text) {
+        editor.pushUndoStop();
+        editor.executeEdits('format', [{ range: model.getFullModelRange(), text: formatted }]);
+        editor.pushUndoStop();
+      }
+    };
+    editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, format);
     const subscription = editor.onDidChangeModelContent(() =>
       onChangeRef.current(editor.getValue()),
     );
     editorRef.current = editor;
+    if (apiRef) {
+      apiRef.current = {
+        selectRange(start, end) {
+          const model = editor.getModel();
+          if (!model) {
+            return;
+          }
+          const from = model.getPositionAt(start);
+          const to = model.getPositionAt(Math.max(start, end));
+          const selection = new monaco.Selection(
+            from.lineNumber,
+            from.column,
+            to.lineNumber,
+            to.column,
+          );
+          editor.setSelection(selection);
+          editor.revealRangeInCenterIfOutsideViewport(selection);
+          editor.focus();
+        },
+        format() {
+          format();
+          editor.focus();
+        },
+      };
+    }
     if (autoFocus) {
       editor.focus();
     }
@@ -69,6 +121,9 @@ export function CodeEditor({
       editor.getModel()?.dispose();
       editor.dispose();
       editorRef.current = undefined;
+      if (apiRef) {
+        apiRef.current = undefined;
+      }
     };
     // Created once with the initial value; later changes are synced by the effect below.
   }, []);

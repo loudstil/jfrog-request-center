@@ -9,12 +9,15 @@ npm run watch      # rebuild on change
 npm test           # unit tests (Vitest)
 npm run typecheck  # extension + webview
 npm run lint
-npm run format     # Prettier
+npm run format     # Prettier (format:check only checks, as CI does)
 npm run package    # build a .vsix
 ```
 
 Press **F5** in VS Code to launch an Extension Development Host with the extension loaded.
 Run **Developer: Reload Window** there after rebuilding.
+
+CI (`.github/workflows/ci.yml`) runs the typecheck, lint, format check and tests on every push
+and pull request, and uploads the packaged `.vsix` as a build artifact.
 
 ## Layout
 
@@ -28,7 +31,8 @@ Run **Developer: Reload Window** there after rebuilding.
 - `src/webview/`: the React UI shown in the webview panels (browser environment).
   - `views/`: `AqlBuilder` (AQL Manager) and `RequestForm` (API Explorer).
   - `components/`: the code editor, results grid and split pane.
-  - `aql/`: the AQL language: highlighting rules and completions.
+  - `aql/`: the AQL language: highlighting rules, completions, the syntax check (parser and
+    field schema) and the formatter.
   - `monaco/`: Monaco setup: editor features, worker, theme sync.
 - `src/shared/`: code and types used by both sides, including the postMessage protocol in
   `messages.ts`.

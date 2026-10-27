@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.0 (unreleased)
+
+### AQL Manager
+
+- Syntax check as you type: errors and warnings are underlined with explanations on hover,
+  with a problem count in the toolbar. Execute lists syntax errors instead of sending the query,
+  with an option to run it anyway.
+- Field-name hints: warnings for fields the query's domain doesn't have, including paths through
+  related entities, with "did you mean" suggestions.
+- Format query (toolbar button or Shift+Alt+F).
+
+### Development
+
+- GitHub Actions CI: typecheck, lint, formatting, tests, and a packaged `.vsix` for every push
+  and pull request.
+
 ## 0.1.0 (2026-10-24)
 
 First release.

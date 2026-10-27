@@ -550,3 +550,75 @@ select.input {
   border-radius: 50%;
   background: var(--vscode-charts-green);
 }
+
+/* ---- AQL syntax check ---- */
+
+.problems-badge {
+  padding: 2px 6px;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.problems-badge:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.problems-badge.has-errors {
+  color: var(--vscode-editorError-foreground, var(--vscode-errorForeground));
+}
+
+.problems-badge.has-warnings {
+  color: var(--vscode-editorWarning-foreground, var(--vscode-charts-yellow));
+}
+
+.problems {
+  margin: 12px;
+}
+
+.problems p {
+  margin: 0 0 8px;
+}
+
+.problems ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problem {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  padding: 3px 6px;
+  border: none;
+  color: var(--vscode-foreground);
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.problem:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.problem:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.problem::before {
+  content: '✕';
+  color: var(--vscode-editorError-foreground, var(--vscode-errorForeground));
+}
+
+.problem-location {
+  flex: none;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
