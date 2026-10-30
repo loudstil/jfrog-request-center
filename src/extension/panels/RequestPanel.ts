@@ -4,6 +4,7 @@ import type { ExtensionToWebview, WebviewToExtension } from '../../shared/messag
 import type { EndpointCatalog } from '../explorer/endpointCatalog';
 import type { RequestExecutor } from '../explorer/requestExecutor';
 import type { ServerManager } from '../services/serverManager';
+import { handleClipboardMessage } from './clipboard';
 import { renderWebviewHtml } from './webviewHtml';
 
 export interface RequestPanelServices {
@@ -63,6 +64,9 @@ export class RequestPanel implements vscode.Disposable {
   }
 
   private async handleMessage(msg: WebviewToExtension): Promise<void> {
+    if (await handleClipboardMessage(msg, (reply) => this.post(reply))) {
+      return;
+    }
     switch (msg.type) {
       case 'ready':
         this.ready = true;

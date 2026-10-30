@@ -2,7 +2,7 @@
   "name": "jfrog-request-center",
   "displayName": "JFrog Request Center",
   "description": "Write and run AQL queries and explore JFrog REST APIs without leaving VS Code.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "loudstil",
   "private": true,
   "license": "MIT",

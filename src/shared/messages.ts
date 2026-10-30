@@ -17,6 +17,10 @@ export type WebviewToExtension =
   | { type: 'executeAql'; requestId: number; query: string }
   | { type: 'cancelAql'; requestId: number }
   | { type: 'copyToClipboard'; text: string }
+  /** Editor cut/copy: write the clipboard without a status message. */
+  | { type: 'clipboardWrite'; text: string }
+  /** Editor paste: answered with `clipboardText`. */
+  | { type: 'clipboardRead'; requestId: number }
   | { type: 'openJson'; content: string }
   /** Save to `savedQueryId`, or prompt for a name if it's missing or `saveAs` is set. */
   | { type: 'saveQuery'; query: string; savedQueryId: string | undefined; saveAs: boolean }
@@ -46,6 +50,7 @@ export type ExtensionToWebview =
   | { type: 'querySaved'; query: string; savedQuery: SavedQueryRef }
   /** The current list of saved queries, so the webview can follow renames and deletions. */
   | { type: 'savedQueries'; queries: SavedQueryRef[] }
+  | { type: 'clipboardText'; requestId: number; text: string }
   // Request form (API Explorer):
   | { type: 'showEndpoint'; endpoint: Endpoint }
   | { type: 'requestOutcome'; endpointId: string; outcome: RequestOutcome };

@@ -1,5 +1,6 @@
 import { type MutableRefObject, useEffect, useRef } from 'react';
 import { monaco, THEME_NAME } from '../monaco/setup';
+import { readClipboard, writeClipboard } from '../utils/clipboard';
 
 /** Lets a parent drive the editor, e.g. move the cursor to a syntax problem. */
 export interface CodeEditorApi {
@@ -83,6 +84,7 @@ export function CodeEditor({
       }
     };
     editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, format);
+    const disposeClipboard = addClipboardCommands(editor, containerRef.current!);
     const subscription = editor.onDidChangeModelContent(() =>
       onChangeRef.current(editor.getValue()),
     );
@@ -118,6 +120,7 @@ export function CodeEditor({
 
     return () => {
       subscription.dispose();
+      disposeClipboard();
       editor.getModel()?.dispose();
       editor.dispose();
       editorRef.current = undefined;
@@ -144,4 +147,90 @@ export function CodeEditor({
   }, [value]);
 
   return <div className="editor" ref={containerRef} />;
+}
+
+/** How long after our own cut/copy/paste a browser clipboard event counts as a duplicate. */
+const DUPLICATE_EVENT_MS = 1000;
+
+/**
+ * Cut, copy and paste with the keyboard through the extension host's clipboard (see
+ * utils/clipboard.ts). Like VS Code, cut or copy with nothing selected takes the whole line.
+ * Returns a function that removes the listeners added to `container`.
+ */
+function addClipboardCommands(
+  editor: monaco.editor.IStandaloneCodeEditor,
+  container: HTMLElement,
+): () => void {
+  let handledAt = 0;
+
+  /** The text to copy, and the ranges it came from (whole lines for empty selections). */
+  const copied = () => {
+    const model = editor.getModel();
+    const selections = editor.getSelections();
+    if (!model || !selections?.length) {
+      return undefined;
+    }
+    const wholeLines = selections.every((s) => s.isEmpty());
+    const ranges = selections.map((s) =>
+      wholeLines
+        ? new monaco.Range(s.startLineNumber, 1, s.startLineNumber + 1, 1)
+        : (s as monaco.Range),
+    );
+    const parts = ranges.map((r, i) =>
+      wholeLines
+        ? `${model.getLineContent(selections[i].startLineNumber)}${model.getEOL()}`
+        : model.getValueInRange(r),
+    );
+    return { text: parts.join(wholeLines ? '' : model.getEOL()), ranges };
+  };
+
+  const copy = () => {
+    handledAt = Date.now();
+    const result = copied();
+    if (result) {
+      writeClipboard(result.text);
+    }
+  };
+
+  const cut = () => {
+    handledAt = Date.now();
+    const result = copied();
+    if (!result || editor.getOption(monaco.editor.EditorOption.readOnly)) {
+      return;
+    }
+    writeClipboard(result.text);
+    editor.pushUndoStop();
+    editor.executeEdits(
+      'cut',
+      result.ranges.map((range) => ({ range, text: '' })),
+    );
+    editor.pushUndoStop();
+  };
+
+  const paste = () => {
+    handledAt = Date.now();
+    void readClipboard().then((text) => {
+      if (text) {
+        editor.focus();
+        // The editor's own paste handling: undo, multiple cursors, auto-indent.
+        editor.trigger('keyboard', 'paste', { text });
+      }
+    });
+  };
+
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, copy);
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, cut);
+  editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, paste);
+
+  // Where VS Code does manage to replay the key as a browser clipboard event, ignore it, so the
+  // text isn't pasted (or the line cut) twice.
+  const ignoreDuplicate = (event: Event) => {
+    if (Date.now() - handledAt < DUPLICATE_EVENT_MS) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+  const events = ['copy', 'cut', 'paste'] as const;
+  events.forEach((type) => container.addEventListener(type, ignoreDuplicate, true));
+  return () => events.forEach((type) => container.removeEventListener(type, ignoreDuplicate, true));
 }

@@ -5,6 +5,7 @@ import { promptForQueryName, type QueryToLoad, toRef } from '../commands/savedQu
 import type { ServerManager } from '../services/serverManager';
 import { JFrogError, type JFrogClient } from '../services/jfrogClient';
 import type { SavedQuery, SavedQueryStore } from '../services/savedQueryStore';
+import { handleClipboardMessage } from './clipboard';
 import { renderWebviewHtml } from './webviewHtml';
 
 export interface AqlPanelServices {
@@ -102,6 +103,9 @@ export class AqlPanel implements vscode.Disposable {
   }
 
   private async handleMessage(msg: WebviewToExtension): Promise<void> {
+    if (await handleClipboardMessage(msg, (reply) => this.post(reply))) {
+      return;
+    }
     switch (msg.type) {
       case 'ready':
         this.ready = true;
