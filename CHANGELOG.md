@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1 (unreleased)
+## 0.2.1 (2026-10-30)
 
 - Fix: cut, copy and paste with the keyboard (Ctrl/Cmd+X, C, V) didn't work in the AQL editor and
   the request body editor.
